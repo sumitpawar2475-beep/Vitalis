@@ -773,7 +773,7 @@ return true;
 }
 
 /* RENDER ALL */
-function renderAll(){ renderDashboard(); renderHydration(); renderMeals(); renderWorkout(); renderMusic(); renderSettings(); renderHeaderAvatar(); lucide.createIcons(); }
+function renderAll(){ if(state.profile){ const h=document.getElementById('bmiToolH'), w=document.getElementById('bmiToolW'); if(h&&w){ h.value=Math.min(+h.max,Math.max(+h.min,Math.round(state.profile.height))); w.value=Math.min(+w.max,Math.max(+w.min,Math.round(state.profile.weight))); } } updateBmiTool(true); renderDashboard(); renderHydration(); renderMeals(); renderWorkout(); renderMusic(); renderSettings(); renderHeaderAvatar(); lucide.createIcons(); }
 
 /* DASHBOARD */
 function renderDashboard(){
@@ -851,30 +851,28 @@ function markTodayStreak(done=true){ state.streakMap[todayStr()]=done; save(); r
 
 /* BMI TOOL */
 function updateBmiTool(silent){
-const hEl=document.getElementById('bmiToolH'), wEl=document.getElementById('bmiToolW'); if(!hEl) return;
-let h=parseFloat(hEl.value), w=parseFloat(wEl.value);
-document.getElementById('bmiToolHLabel').textContent=h+' cm';
-document.getElementById('bmiToolWLabel').textContent=w+' kg';
-const bmi=w/Math.pow(h/100,2);
-document.getElementById('bmiToolValue').textContent=bmi.toFixed(1);
-const cat=bmi<18.5?'Underweight':bmi<25?'Healthy':bmi<30?'Overweight':'Obesity';
-const catEl=document.getElementById('bmiToolCat'); catEl.textContent=cat;
-catEl.className='text-center text-[11px] font-bold px-2 py-0.5 rounded-full border inline-block mx-auto '+(bmi<18.5?'bg-sky-50 text-sky-700 border-sky-200':bmi<25?'bg-emerald-50 text-emerald-700 border-emerald-200':bmi<30?'bg-amber-50 text-amber-700 border-amber-200':'bg-rose-50 text-rose-700 border-rose-200');
-const angle=Math.min(180,Math.max(0,(bmi-12)/(40-12)*180));
-const needle=document.getElementById('bmiNeedle'); if(needle) needle.style.transform=`rotate(${-90+angle}deg)`;
+const hEl=document.getElementById('bmiToolH'), wEl=document.getElementById('bmiToolW'); if(!hEl||!wEl) return;
+const h=Number(hEl.value), w=Number(wEl.value), value=document.getElementById('bmiToolValue'), catEl=document.getElementById('bmiToolCat');
+document.getElementById('bmiToolHLabel').textContent=h+' cm'; document.getElementById('bmiToolWLabel').textContent=w+' kg';
+if(!Number.isFinite(h)||!Number.isFinite(w)||h<100||h>210||w<20||w>130){ value.textContent='—'; catEl.textContent='Adjust values'; return; }
+const bmi=w/Math.pow(h/100,2); value.textContent=bmi.toFixed(1);
+const age=Number((state.profile||demoProfiles.adults).age);
+const cat=age<20?'Age-specific guidance needed':bmi<18.5?'Underweight':bmi<25?'Healthy':bmi<30?'Overweight':'Obesity'; catEl.textContent=cat;
+catEl.className='text-center text-[11px] font-bold px-2 py-0.5 rounded-full border inline-block mx-auto '+(age<20?'bg-amber-50 text-amber-800 border-amber-200':bmi<18.5?'bg-sky-50 text-sky-700 border-sky-200':bmi<25?'bg-emerald-50 text-emerald-700 border-emerald-200':bmi<30?'bg-amber-50 text-amber-700 border-amber-200':'bg-rose-50 text-rose-700 border-rose-200');
+const angle=Math.min(180,Math.max(0,(bmi-12)/(40-12)*180)); const needle=document.getElementById('bmiNeedle'); if(needle) needle.style.transform=`rotate(${-90+angle}deg)`;
 }
-function syncBmiToProfile(){ const p=state.profile||demoProfiles.adults; document.getElementById('bmiToolH').value=Math.round(p.height); document.getElementById('bmiToolW').value=Math.round(p.weight); updateBmiTool(); showToast('Loaded profile values into calculator'); }
-function saveBmiToProfile(){ if(!state.profile){ showToast('Create profile first'); return; } state.profile.height=parseFloat(document.getElementById('bmiToolH').value); state.profile.weight=parseFloat(document.getElementById('bmiToolW').value); state.hydration.goal=calcWater(state.profile); save(); generateMeals(); renderAll(); showToast('Saved to profile — water & workouts updated'); }
+function syncBmiToProfile(){ const p=state.profile||demoProfiles.adults; document.getElementById('bmiToolH').value=Math.min(210,Math.max(100,Math.round(p.height))); document.getElementById('bmiToolW').value=Math.min(130,Math.max(20,Math.round(p.weight))); updateBmiTool(); showToast('Loaded profile values into calculator'); }
+function saveBmiToProfile(){ if(!state.profile){ showToast('Create profile first'); return; } const h=Number(document.getElementById('bmiToolH').value), w=Number(document.getElementById('bmiToolW').value); if(!Number.isFinite(h)||!Number.isFinite(w)||h<100||h>210||w<20||w>130){ showToast('Choose a valid height and weight'); return; } state.profile.height=h; state.profile.weight=w; state.hydration.goal=calcWater(state.profile); save(); generateMeals(); renderAll(); showToast('Saved to profile — water & workouts updated'); }
 
 /* HYDRATION */
 function renderHydration(){
-const h=state.hydration; const totalGlass=h.glasses.length; const done=h.glasses.filter(Boolean).length;
+syncHydrationGlasses(); const h=state.hydration; const totalGlass=h.glasses.length; const done=h.glasses.filter(Boolean).length;
 document.getElementById('hydrationCountLabel').textContent=`${done} / ${totalGlass}`;
 document.getElementById('hydrationLiters').textContent=(h.consumed/1000).toFixed(2)+' L';
 document.getElementById('hydrationGoalText').textContent=(h.goal/1000).toFixed(2)+' L';
 document.getElementById('waterTargetLabel').textContent=h.goal+' ml';
 document.getElementById('waterTargetRange').value=h.goal;
-const pct=Math.min(100,Math.round(h.consumed/h.goal*100));
+const pct=Math.min(100,Math.round(h.consumed/Math.max(1,h.goal)*100));
 document.getElementById('waterFill').style.height=pct+'%';
 document.getElementById('waterPercent').textContent=pct+'%';
 const grid=document.getElementById('glassGrid'); grid.innerHTML='';
@@ -886,10 +884,12 @@ const list=document.getElementById('scheduleList'); list.innerHTML='';
 times.slice(0,totalGlass).forEach((t,i)=>{ const doneS=h.scheduleDone[i]; const row=document.createElement('button'); row.onclick=()=>{ h.scheduleDone[i]=!h.scheduleDone[i]; save(); renderHydration(); }; row.className=`w-full flex items-center gap-3 p-3 rounded-xl border text-left ${doneS?'bg-teal-50 border-teal/30':'bg-slate-50 border-slate-200'}`; row.innerHTML=`<span class="w-6 h-6 rounded-full ${doneS?'bg-teal text-white':'bg-white border'} flex items-center justify-center text-xs font-bold">${doneS?'✓':i+1}</span><span class="text-sm font-semibold flex-1">${t}</span><span class="text-[11px] text-slate-400">250 ml</span>`; list.appendChild(row); });
 document.getElementById('reminderToggle').checked=state.reminders;
 }
-function addGlass(n){ const h=state.hydration; if(n>0){ const idx=h.glasses.indexOf(false); if(idx!==-1) h.glasses[idx]=true; h.consumed+=250; celebrate(); } else { const idx=h.glasses.lastIndexOf(true); if(idx!==-1) h.glasses[idx]=false; h.consumed=Math.max(0,h.consumed-250); } if(h.consumed>=h.goal) markTodayStreak(true); save(); renderHydration(); renderDashboard(); }
-function toggleGlass(i){ state.hydration.glasses[i]=!state.hydration.glasses[i]; state.hydration.consumed+=state.hydration.glasses[i]?250:-250; state.hydration.consumed=Math.max(0,state.hydration.consumed); if(state.hydration.consumed>=state.hydration.goal){ markTodayStreak(true); celebrate(); } save(); renderHydration(); renderDashboard(); }
-function addCustom(){ const ml=parseInt(document.getElementById('customMl').value); state.hydration.consumed+=ml; const need=Math.floor(ml/250); for(let k=0;k<need;k++){ const idx=state.hydration.glasses.indexOf(false); if(idx!==-1) state.hydration.glasses[idx]=true; } if(state.hydration.consumed>=state.hydration.goal){ markTodayStreak(true); celebrate(); } save(); renderHydration(); renderDashboard(); showToast(`+${ml} ml logged 💧`); }
-function resetHydration(){ state.hydration.consumed=0; state.hydration.glasses=state.hydration.glasses.map(()=>false); state.hydration.scheduleDone={}; save(); renderHydration(); renderDashboard(); }
+function syncHydrationGlasses(){ const h=state.hydration; const count=Math.max(1,Math.ceil(h.goal/250)); h.glasses=Array.from({length:count},(_,i)=>i<Math.floor(h.consumed/250)); }
+function finishWaterUpdate(){ const h=state.hydration; syncHydrationGlasses(); if(h.consumed>=h.goal) markTodayStreak(true); save(); renderHydration(); renderDashboard(); }
+function addGlass(n){ const h=state.hydration; if(n>0){ h.consumed+=250; celebrate(); } else { if(h.consumed<250){ showToast('No full glass to remove'); return; } h.consumed-=250; } finishWaterUpdate(); }
+function toggleGlass(i){ const h=state.hydration; const wasFull=!!h.glasses[i]; h.consumed=Math.max(0,h.consumed+(wasFull?-250:250)); if(h.consumed>=h.goal) celebrate(); finishWaterUpdate(); }
+function addCustom(){ const ml=Number(document.getElementById('customMl').value); if(!Number.isFinite(ml)||ml<=0){ showToast('Choose a valid amount'); return; } state.hydration.consumed+=ml; if(state.hydration.consumed>=state.hydration.goal) celebrate(); finishWaterUpdate(); showToast(`+${ml} ml logged 💧`); }
+function resetHydration(){ state.hydration.consumed=0; state.hydration.glasses=Array.from({length:Math.max(1,Math.ceil(state.hydration.goal/250))},()=>false); state.hydration.scheduleDone={}; save(); renderHydration(); renderDashboard(); }
 function toggleReminders(v){ state.reminders=v; save(); showToast(v?'Reminders ON (demo) 🔔':'Reminders OFF'); }
 function celebrate(){ if(state.reduceMotion) return; if(state.ageStyle==='kids'){ for(let i=0;i<24;i++){ const c=document.createElement('div'); c.className='confetti'; c.style.left=Math.random()*100+'vw'; c.style.background=['#FF6B5A','#FFD93D','#6BCB77','#4D96FF','#B983FF'][i%5]; c.style.borderRadius=Math.random()>0.5?'50%':'4px'; document.body.appendChild(c); setTimeout(()=>c.remove(),1500); } } }
 
@@ -1100,3 +1100,5 @@ box.scrollTop=box.scrollHeight;
 </script>
 </body>
 </html>
+
+
