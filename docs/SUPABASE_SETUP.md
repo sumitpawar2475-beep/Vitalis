@@ -22,13 +22,13 @@ Email verification and password-reset links must return to an allowed URL.
 
 ## 4. Add the browser-safe project values
 
-In `index.html`, find `SUPABASE_URL` and `SUPABASE_ANON_KEY` near the top of the main script. Replace the placeholders with your Supabase **Project URL** and **publishable (anon) key** from Project Settings → API.
+In `js/app.js`, find `SUPABASE_URL` and `SUPABASE_ANON_KEY` near the top of the file. Replace the placeholders with your Supabase **Project URL** and **publishable (anon) key** from Project Settings → API.
 
-The publishable/anon key is intended for browser use when row-level security is correctly enabled. **Never put the `service_role` key in `index.html`, GitHub, or any other public client file.**
+The publishable/anon key is intended for browser use when row-level security is correctly enabled. **Never put the `service_role` key in GitHub or any public client file.**
 
 ## 5. Deploy the site
 
-Commit the configured `index.html` and `supabase/schema.sql` to your repository and deploy it with GitHub Pages or another static host. Add the final deployment URL to Supabase's allowed redirect URLs. The app reports a configuration message on the sign-in screen if the placeholders have not been replaced.
+Keep `index.html`, `css/styles.css`, the `js/` files, and `supabase/schema.sql` in the repository with their folder structure intact. Deploy the repository with GitHub Pages or another static host, then add the final website URL to Supabase's allowed redirect URLs. The app reports a configuration message on the sign-in screen if the placeholders have not been replaced.
 
 ## How account data is saved
 
