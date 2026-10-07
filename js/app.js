@@ -1,6 +1,6 @@
 // Configure these with the Project URL and publishable (anon) key from your Supabase project.
-const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY';
+const SUPABASE_URL = 'https://eqsqbjqemjxsaixmffqf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_I7A_OzeOZq-LRAbdB0U2EA_ok3rK2eO';
 const supabaseClient = window.supabase && !SUPABASE_URL.includes('YOUR_PROJECT_ID') && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
