@@ -1,35 +1,21 @@
 # Technical Overview
 
-## Application shape
+## Application
 
-The supplied prototype is implemented as a single HTML page with embedded styling and JavaScript. The main app screens are switched within the page rather than served as separate routes. Styling uses Tailwind CSS loaded from its CDN, with custom CSS for age styles and components. Icons use Lucide, charts use Chart.js, and font families load from Google Fonts.
+The VITALIS frontend is a single-page HTML application. Tailwind CSS, Lucide, Chart.js, Google Fonts, and Supabase JS are loaded from CDNs. Supabase URL and publishable/anon key are configured as public browser values in `index.html`; a service-role key must never be included in frontend code.
 
-## State and persistence
+## Authentication
 
-The app keeps profile and interface state in a JavaScript state object and serializes it to browser `localStorage` using the key `vitalis_state`. The default state includes profile, age style, units, language, theme, hydration data, workout logs, and streak information. Storage is local to the browser profile and device; there is no server-side account database in this prototype.
+Supabase Auth handles email/password account creation, password verification, persisted auth sessions, email verification, and password-reset email requests. The frontend uses `signUp`, `signInWithPassword`, `resetPasswordForEmail`, `getSession`, and `signOut`. Passwords are not stored in VITALIS app tables.
 
-## Main calculations
+## Persistence and access control
 
-- **BMI:** weight in kilograms divided by height in metres squared.
-- **Water target:** an estimate derived from body weight with adjustments for climate, activity, and age, bounded by minimum and maximum values.
-- **Energy and workout values:** formula-based estimates intended for general wellbeing demonstration.
+The app stores the current application state as JSONB in `public.user_app_state`, keyed by the authenticated Supabase user UUID. The state includes profile/settings, hydration data, workout logs, and streak history. Changes are debounced to reduce writes; sign-out flushes pending state before ending the session. Authenticated users can read, insert, update, or delete only the row whose `user_id` equals `auth.uid()`; `supabase/schema.sql` enables row-level security and defines these policies.
 
-These calculations should be reviewed before production use. In particular, adult BMI categories are not appropriate for classifying children, and water needs vary by individual and circumstance.
+## Setup and deployment
 
-## External resources
+See [Supabase setup](SUPABASE_SETUP.md) for creating the project, applying the schema, configuring redirects and email auth, setting the public project values, and deploying the static site.
 
-The prototype references these browser-loaded services:
+## Limitations
 
-- Tailwind CSS CDN
-- Lucide icon package
-- Chart.js CDN
-- Google Fonts (Plus Jakarta Sans, Nunito, Lexend, Outfit, and Space Grotesk)
-
-Availability and behavior depend on network access and the services' current versions. For a production deployment, consider pinning dependencies and reviewing accessibility, security, privacy, and licensing requirements.
-
-## Prototype limitations
-
-- Sign-in and account creation are demo interface flows, not real authentication.
-- Data is stored in browser local storage and is not synchronized across devices.
-- Health, nutrition, water, and exercise outputs are estimates and are not clinically validated.
-- Verify each interactive feature and browser behavior before treating the prototype as production-ready.
+The repository contains a frontend integration and SQL setup, but it cannot connect to a real Supabase project until the project URL and publishable key are configured and the schema is applied. Account and database behavior must then be tested against that project. The current app is not a production health service; estimates are informational and not clinically validated.

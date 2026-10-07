@@ -1,27 +1,32 @@
 # VITALIS — SDG 3 Wellbeing Companion
 
-VITALIS is a responsive wellbeing website prototype for hydration, balanced meals, movement, and healthy routines, with visual styles for Kids, Teens, Adults, and Seniors.
-
-> **Disclaimer:** VITALIS provides general wellbeing information and estimates. It is not medical advice or a diagnostic tool.
+VITALIS is a responsive wellbeing web app prototype for hydration, balanced meals, movement, and healthy routines. It has visual styles for Kids, Teens, Adults, and Seniors.
 
 ## Features
 
-- Personalized dashboard with BMI and water estimates, daily focus, streak calendar, energy overview, rewards, and workout preview.
-- Hydration plan with glass tracking, custom amounts, adjustable targets, schedule check-offs, and daily reset.
-- Seven-day meal planner, recipe details, serving scaling, prep timer, and shopping list.
+- Personalized dashboard with BMI and water estimates, daily focus, activity streaks, and workout summaries.
+- Hydration tracker with custom intake amounts, adjustable goals, schedule check-offs, and history.
+- Seven-day meal planner with recipe details, adjustable servings, cooking timer, and shopping list.
 - Workout suggestions, activity logging, estimated calorie burn, and music controls.
-- Four-step profile setup, age-specific styles, language and theme controls, SDG 3 information, and VITA in-app guide.
+- Account registration and sign-in with email and password, email verification, password reset, and cloud-saved user state.
+- Profile setup, age-specific styles, settings, SDG 3 information, and VITA in-app guide.
 
-## Run locally
+## Run and configure
 
-Open `index.html` in a modern browser. The prototype loads Tailwind CSS, Lucide icons, Chart.js, and Google Fonts from CDNs, so internet access is required for those resources. Choose **Continue as guest** or a sample profile to explore; sign-in is demo-only.
+The app is a static HTML page. Open `index.html` in a browser after configuring the Supabase project as described in [Supabase setup](docs/SUPABASE_SETUP.md). The project URL and public/publishable key must be added in the app source. Never put a Supabase service-role key in browser code.
+
+The page loads Tailwind CSS, Lucide icons, Chart.js, Google Fonts, and Supabase JS from CDNs, so an internet connection is needed.
 
 ## Documentation
 
+- [Supabase setup and account configuration](docs/SUPABASE_SETUP.md)
 - [Feature guide](docs/FEATURES.md)
 - [User guide](docs/USER_GUIDE.md)
 - [Technical overview](docs/TECHNICAL_OVERVIEW.md)
+- [Database schema](supabase/schema.sql)
 
-## Prototype notes
+## Prototype and privacy notes
 
-The app stores profile and usage state in browser local storage. It has no production authentication or backend synchronization. BMI, water, nutrition, energy, and calorie-burn outputs are estimates and are not clinically validated.
+Passwords are managed by Supabase Auth. Profile, preferences, hydration logs, workout logs, and streak history are saved to a per-user database row protected by row-level security. This project does not include a custom backend server.
+
+Health and wellbeing values are estimates, not medical advice. Before collecting real health or children’s data or launching publicly, review privacy, consent, data retention, and applicable legal requirements.

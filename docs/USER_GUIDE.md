@@ -1,39 +1,30 @@
 # User Guide
 
-## Open the prototype
+## Create an account
 
-1. Open `index-1.html` in a current desktop or mobile browser.
-2. Choose **Continue as guest** to explore, or choose a sample profile.
-3. Complete the four-step profile setup if you want to enter your own details.
-4. Use the sidebar (or mobile navigation) to open Dashboard, Hydration, Meal Plan, Workout, SDG 3, and Settings.
+1. Open the deployed VITALIS site after the owner has configured its Supabase project.
+2. Choose **Create account**, enter an email address and a password of at least eight characters, and submit.
+3. Verify your email if prompted, then sign in with the same email and password.
+4. Complete the profile setup. The app then saves your profile to your account.
 
-The prototype loads styles, icons, charts, and fonts from external services. An internet connection is needed for those resources.
+## Sign in and continue later
 
-## Navigate the app
+Enter the same account email and password to sign in. Your profile, hydration, workout activity, and streak history load from your account. Use **Sign out** in Settings when finished, especially on a shared device. Your saved activity remains associated with your account after sign-out.
 
-- Select a page from the navigation menu.
-- Change the age style from the header or Settings.
-- Use the language and theme controls in the header/settings.
-- Open **Edit profile** to update profile details.
+Use **Forgot password?** on the sign-in form to request a reset email. Reset links work only after the site owner has configured the allowed redirect URLs in Supabase.
 
-## Log water
+## Use the app
 
-On Hydration, use **+1 glass** or tap individual glass icons to track intake. Use the custom amount control for a different amount. Adjust the target slider to change the displayed goal. The schedule rows can be checked off, and **Reset today** clears today's displayed hydration progress.
+- Use the sidebar or mobile navigation to open Dashboard, Hydration, Meal Plan, Workout, SDG 3, and Settings.
+- On Hydration, log intake, adjust your target, check off schedule items, or reset today's intake.
+- Open meal cards for recipes, serving controls, prep steps, timer, and shopping-list actions.
+- Log completed exercises on Workout to update activity history and streaks.
+- Profile changes and activity are automatically saved to the signed-in account.
 
-## Explore recipes
+## Account privacy
 
-Open a meal card to view recipe details. Change servings to adjust ingredient quantities, choose a prep style, use the timer, switch recipe tabs, print the recipe, or add ingredients to the shopping list.
-
-## Log a workout
-
-Open Workout, select or complete an exercise, and use the logging controls to record activity. Estimates shown on this page are informational only.
-
-## Data and privacy
-
-The prototype saves its state in browser local storage under the `vitalis_state` key. This can include profile information, preferences, optional profile photo data, hydration and workout logs. The demo sign-in does not create or authenticate an account. Clearing browser data or using another browser/device may remove or not include saved information.
-
-The prototype's privacy interface describes VITA chat messages as the only data that may be sent externally. Review the actual implementation and any connected service behavior before using real personal information or deploying publicly.
+Supabase handles passwords. VITALIS stores account data in a database row linked to the authenticated user ID and protected by row-level security. The site owner can access/manage the Supabase project and must set privacy and retention policies. Use sign out on shared devices.
 
 ## Health information
 
-BMI, water goals, nutrition, energy, and calorie-burn values are estimates. The app is not a medical device and should not be used to diagnose, treat, or make medical decisions. Children, older adults, people with health conditions, and people taking medications should seek individualized guidance from a qualified professional.
+BMI, water, nutrition, energy, and calorie-burn values are estimates. VITALIS is not a medical device and does not diagnose or treat conditions. Consult a qualified professional for individual medical guidance.

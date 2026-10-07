@@ -7,6 +7,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Nunito:wght@700;800;900&family=Lexend:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <script>
 tailwind.config={ theme:{ extend:{ colors:{ teal:{DEFAULT:'#0F766E',light:'#14B8A6',dark:'#115E59',50:'#F0FDFA'}, coral:{DEFAULT:'#FF6B5A',light:'#FF8A7A',dark:'#E85A4A'}, cream:{DEFAULT:'#FDFBF7',dark:'#FFF7ED',border:'#FDEDD5'} }, fontFamily:{ jakarta:['Plus Jakarta Sans','sans-serif'], nunito:['Nunito','sans-serif'], lexend:['Lexend','sans-serif'], outfit:['Outfit','sans-serif'] } } }}
@@ -112,7 +113,7 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 <div class="bg-[#FF6B5A] rounded-[20px] p-4 text-white relative overflow-hidden"><div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center"><i data-lucide="apple" class="w-5 h-5"></i></div><p class="font-bold text-sm mt-3 leading-none">Balanced meals</p><p class="text-xs text-white/80">Veg & non-veg</p></div>
 <div class="bg-white rounded-[20px] p-4 text-slate-800"><div class="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center text-amber-600"><i data-lucide="dumbbell" class="w-5 h-5"></i></div><p class="font-bold text-sm mt-3 leading-none">Workout + music</p><p class="text-xs text-slate-500">Burn & beats</p></div>
 </div>
-<div class="hidden lg:flex items-center gap-3 mt-8 text-xs text-white/70"><span class="flex items-center gap-1.5"><i data-lucide="shield-check" class="w-4 h-4"></i> Local-first. Your data stays on this device.</span><span class="w-1 h-1 bg-white/40 rounded-full"></span><span class="flex items-center gap-1.5"><i data-lucide="leaf" class="w-4 h-4"></i> Aligned with UN SDG 3</span></div>
+<div class="hidden lg:flex items-center gap-3 mt-8 text-xs text-white/70"><span class="flex items-center gap-1.5"><i data-lucide="shield-check" class="w-4 h-4"></i> Account-linked. Your progress returns when you sign in.</span><span class="w-1 h-1 bg-white/40 rounded-full"></span><span class="flex items-center gap-1.5"><i data-lucide="leaf" class="w-4 h-4"></i> Aligned with UN SDG 3</span></div>
 </div>
 <div class="hidden lg:block mt-8 bg-white/10 border border-white/15 rounded-2xl p-4 max-w-[520px]"><p class="text-xs font-semibold tracking-widest text-white/70">TRUSTED SOURCES</p><p class="text-sm text-white/90 leading-relaxed mt-1">Guidance informed by WHO healthy diet & hydration factsheets and UN SDG 3. <span class="underline decoration-white/30">Not medical advice.</span></p></div>
 </div>
@@ -120,23 +121,24 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 <div class="flex-1 bg-cream flex items-center justify-center p-4 lg:p-8 relative">
 <div class="w-full max-w-[460px] bg-white rounded-[28px] shadow-[0_20px_60px_rgba(15,118,110,.10)] border border-cream-border overflow-hidden">
 <div class="px-6 sm:px-8 pt-7 pb-2">
-<div class="flex items-center justify-between"><h2 class="text-[22px] font-extrabold tracking-tight text-slate-800 font-display">Welcome to VITALIS</h2><span class="text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">DEMO MODE</span></div>
+<div class="flex items-center justify-between"><h2 class="text-[22px] font-extrabold tracking-tight text-slate-800 font-display">Welcome to VITALIS</h2><span class="text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">ACCOUNT REQUIRED</span></div>
 <p class="text-sm text-slate-500 mt-1">Supportive, health-focused — never clinical. Your wellbeing, your pace.</p>
 <div class="mt-5 grid grid-cols-2 p-1 bg-slate-100 rounded-full">
 <button id="tabSignin" onclick="switchAuthTab('signin')" class="py-2.5 rounded-full bg-[#0F766E] text-white font-semibold text-sm shadow">Sign in</button>
 <button id="tabCreate" onclick="switchAuthTab('create')" class="py-2.5 rounded-full text-slate-600 font-semibold text-sm">Create account</button>
 </div>
-<p class="text-[11px] text-slate-400 mt-2 text-center">Demo only — no real authentication. Data stays on this device.</p>
+<p class="text-[11px] text-slate-400 mt-2 text-center">Sign in to securely access your saved profile and activity from your account.</p>
 </div>
 <form id="authForm" class="px-6 sm:px-8 pb-6 space-y-4" novalidate onsubmit="handleAuth(event)">
-<div><label class="text-xs font-semibold text-slate-700">Email</label><div class="relative mt-1"><i data-lucide="mail" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i><input id="authEmail" type="email" placeholder="you@example.com" class="w-full pl-10 pr-3 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-teal focus:ring-4 focus:ring-teal/10 outline-none text-sm"></div><p id="errEmail" class="hidden text-xs text-[#FF6B5A] mt-1"></p></div>
-<div><div class="flex items-center justify-between"><label class="text-xs font-semibold text-slate-700">Password</label><button type="button" onclick="togglePwd()" class="text-xs font-semibold text-teal flex items-center gap-1"><i data-lucide="eye" class="w-3.5 h-3.5"></i> <span id="pwdToggleText">Show</span></button></div><div class="relative mt-1"><i data-lucide="lock" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i><input id="authPwd" type="password" placeholder="At least 6 characters" class="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-teal focus:ring-4 focus:ring-teal/10 outline-none text-sm"><button type="button" onclick="togglePwd()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><i data-lucide="eye-off" class="w-4 h-4"></i></button></div><p id="errPwd" class="hidden text-xs text-[#FF6B5A] mt-1"></p></div>
-<div class="flex items-center gap-2 text-xs text-slate-500"><i data-lucide="info" class="w-3.5 h-3.5 text-teal"></i><span>We store profile & health data <b class="text-slate-700">only on this device</b>.</span></div>
-<button type="submit" class="w-full py-3.5 rounded-xl bg-[#0F766E] hover:bg-teal-dark text-white font-bold shadow-[0_8px_20px_rgba(15,118,110,.25)] flex items-center justify-center gap-2">Continue <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
-<div class="flex items-center gap-3"><div class="h-px flex-1 bg-slate-200"></div><span class="text-xs text-slate-400">or</span><div class="h-px flex-1 bg-slate-200"></div></div>
-<button type="button" onclick="continueAsGuest()" class="w-full py-3 rounded-xl bg-white border border-slate-200 font-semibold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-2"><i data-lucide="user-round" class="w-4 h-4"></i> Continue as guest — explore instantly</button>
-<div class="bg-[#FFFBEB] border border-amber-200 rounded-xl p-3 flex gap-3"><div class="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center text-white shrink-0"><i data-lucide="sparkles" class="w-4 h-4"></i></div><div><p class="text-xs font-bold text-amber-800">Try a sample profile</p><div class="flex flex-wrap gap-1.5 mt-1.5"><button type="button" onclick="loadDemo('kids')" class="text-xs px-2.5 py-1 rounded-full bg-white border border-amber-200 hover:bg-amber-50">🧒 Kids — Aanya, 9</button><button type="button" onclick="loadDemo('teens')" class="text-xs px-2.5 py-1 rounded-full bg-white border border-amber-200 hover:bg-amber-50">🎒 Teens — Arjun, 16</button><button type="button" onclick="loadDemo('adults')" class="text-xs px-2.5 py-1 rounded-full bg-white border border-amber-200 hover:bg-amber-50">💼 Adults — Priya, 34</button><button type="button" onclick="loadDemo('seniors')" class="text-xs px-2.5 py-1 rounded-full bg-white border border-amber-200 hover:bg-amber-50">🌿 Seniors — Ramesh, 68</button></div></div></div>
+<div><label class="text-xs font-semibold text-slate-700">Email</label><div class="relative mt-1"><i data-lucide="mail" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i><input id="authEmail" type="email" required autocomplete="email" placeholder="you@example.com" class="w-full pl-10 pr-3 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-teal focus:ring-4 focus:ring-teal/10 outline-none text-sm"></div><p id="errEmail" class="hidden text-xs text-[#FF6B5A] mt-1"></p></div>
+<div><div class="flex items-center justify-between"><label class="text-xs font-semibold text-slate-700">Password</label><button type="button" onclick="togglePwd()" class="text-xs font-semibold text-teal flex items-center gap-1"><i data-lucide="eye" class="w-3.5 h-3.5"></i> <span id="pwdToggleText">Show</span></button></div><div class="relative mt-1"><i data-lucide="lock" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i><input id="authPwd" type="password" required minlength="8" autocomplete="current-password" placeholder="At least 8 characters" class="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-teal focus:ring-4 focus:ring-teal/10 outline-none text-sm"><button type="button" onclick="togglePwd()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"><i data-lucide="eye-off" class="w-4 h-4"></i></button></div><p id="errPwd" class="hidden text-xs text-[#FF6B5A] mt-1"></p></div>
+<div class="flex items-center gap-2 text-xs text-slate-500"><i data-lucide="shield-check" class="w-3.5 h-3.5 text-teal"></i><span>Your account data is saved securely and is available when you sign in again.</span></div>
+<button id="authSubmit" type="submit" class="w-full py-3.5 rounded-xl bg-[#0F766E] hover:bg-teal-dark text-white font-bold shadow-[0_8px_20px_rgba(15,118,110,.25)] flex items-center justify-center gap-2"><span id="authSubmitText">Sign in</span> <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+<div class="flex items-center justify-end"><button type="button" onclick="sendPasswordReset()" class="text-xs font-semibold text-teal">Forgot password?</button></div><p id="authStatus" class="hidden rounded-xl bg-teal-50 border border-teal/20 p-3 text-xs text-teal-dark"></p>
+
+
 </form>
+<div id="passwordRecovery" class="hidden px-6 sm:px-8 pb-6 space-y-4"><h3 class="font-bold text-lg">Choose a new password</h3><p class="text-sm text-slate-500">Use at least eight characters for your new password.</p><input id="newPassword" type="password" minlength="8" autocomplete="new-password" class="w-full px-3 py-3 rounded-xl border border-slate-200 bg-slate-50" placeholder="New password"><p id="passwordRecoveryStatus" class="hidden rounded-xl p-3 text-xs"></p><button type="button" onclick="completePasswordReset()" class="w-full py-3 rounded-xl bg-teal text-white font-bold">Update password</button></div>
 </div>
 </div>
 </div>
@@ -194,7 +196,7 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 </div>
 <div id="step4" class="hidden space-y-5">
 <h3 class="text-xl font-extrabold font-display">Wellness & goals</h3>
-<div class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-3"><i data-lucide="shield" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"></i><p class="text-xs leading-relaxed text-amber-900"><b>Why we ask (optional):</b> Sleep, health notes & medications help tailor tone and reminders gently. <b>Skip anytime.</b> This is not medical advice and is stored only on this device.</p></div>
+<div class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-3"><i data-lucide="shield" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"></i><p class="text-xs leading-relaxed text-amber-900"><b>Why we ask (optional):</b> Sleep, health notes & medications help tailor tone and reminders gently. <b>Skip anytime.</b> This is not medical advice and is stored in your account.</p></div>
 <div class="grid sm:grid-cols-2 gap-4"><div><label class="text-xs font-semibold">Sleep hours (per night)</label><input id="inpSleep" type="number" min="3" max="12" step="0.5" value="7.5" class="mt-1 w-full px-3 py-3 rounded-xl border border-slate-200 bg-slate-50"></div><div><label class="text-xs font-semibold">Wellness goal</label><select id="inpGoal" class="mt-1 w-full px-3 py-3 rounded-xl border border-slate-200 bg-slate-50"><option value="balanced">Balanced wellbeing</option><option value="energy">More energy & hydration</option><option value="muscle">Build healthy habits / muscle</option><option value="light">Light & mindful eating</option></select></div></div>
 <div><label class="text-xs font-semibold">Health considerations <span class="text-slate-400 font-normal">(optional)</span></label><input id="inpHealth" placeholder="e.g., vegetarian since childhood — optional" class="mt-1 w-full px-3 py-3 rounded-xl border border-slate-200 bg-slate-50"></div>
 <div><label class="text-xs font-semibold">Medications <span class="text-slate-400 font-normal">(optional)</span></label><input id="inpMeds" placeholder="Optional — helps avoid generic suggestions" class="mt-1 w-full px-3 py-3 rounded-xl border border-slate-200 bg-slate-50"></div>
@@ -206,7 +208,7 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 <button id="btnFinish" onclick="finishProfile()" class="hidden ml-auto px-7 py-3 rounded-xl bg-teal text-white font-bold shadow flex items-center gap-2">Finish & go to dashboard <i data-lucide="check" class="w-4 h-4"></i></button>
 <button onclick="skipOptional()" id="btnSkip" class="hidden text-sm font-semibold text-slate-500 px-3">Skip optional →</button>
 </div>
-<p class="text-[11px] text-slate-400 mt-3 text-center">You can edit or clear your profile anytime in Settings. Data stays on this device.</p>
+<p class="text-[11px] text-slate-400 mt-3 text-center">You can edit or clear your account profile anytime in Settings.</p>
 </div>
 </div>
 </div>
@@ -216,7 +218,7 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 <div id="app" class="hidden min-h-screen bg-cream">
 <header class="sticky top-0 z-30 bg-white/90 glass border-b border-slate-200">
 <div class="max-w-[1280px] mx-auto px-4 lg:px-6 h-[64px] flex items-center gap-4">
-<div class="flex items-center gap-3"><div class="w-9 h-9 rounded-xl bg-teal flex items-center justify-center text-white shadow"><i data-lucide="droplets" class="w-5 h-5"></i></div><div class="leading-none"><p class="font-extrabold tracking-tight text-[15px] font-display">VITALIS</p><p class="text-[10px] tracking-[0.14em] font-bold text-slate-400">SDG 3 • WELLBEING</p></div><span class="hidden sm:inline-flex ml-2 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">DEMO</span></div>
+<div class="flex items-center gap-3"><div class="w-9 h-9 rounded-xl bg-teal flex items-center justify-center text-white shadow"><i data-lucide="droplets" class="w-5 h-5"></i></div><div class="leading-none"><p class="font-extrabold tracking-tight text-[15px] font-display">VITALIS</p><p class="text-[10px] tracking-[0.14em] font-bold text-slate-400">SDG 3 • WELLBEING</p></div><span class="hidden sm:inline-flex ml-2 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">ACCOUNT</span></div>
 <div class="hidden lg:flex items-center gap-1.5 ml-6"><span class="text-xs font-semibold text-slate-500 mr-1">Style:</span>
 <button onclick="selectAgeStyle('kids')" data-style-nav="kids" class="styleNav px-3 py-1.5 rounded-full border text-xs font-bold">🌈 Kids</button>
 <button onclick="selectAgeStyle('teens')" data-style-nav="teens" class="styleNav px-3 py-1.5 rounded-full border text-xs font-bold">⚡ Teens</button>
@@ -396,7 +398,7 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 <div class="bg-white rounded-[20px] border border-slate-200 p-3 flex flex-wrap gap-2 items-center"><span class="text-xs font-bold tracking-widest text-slate-400">ALLERGEN LEGEND:</span><span class="text-xs px-2 py-1 rounded-full bg-red-50 text-red-600 border border-red-200">🥜 Peanut</span><span class="text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">🥛 Dairy</span><span class="text-xs px-2 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200">🌾 Gluten</span><span class="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">🍗 Non-veg</span><span class="ml-auto text-[11px] text-slate-500">Age-appropriate portions • Budget: <b id="mealBudgetLabel">Medium</b> • <span class="text-teal font-bold">Tap card → View recipe</span></span></div>
 <div class="flex gap-2 overflow-auto pb-1" id="dayTabs"></div>
 <div id="mealGrid" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
-<div id="shoppingList" class="hidden bg-white rounded-[20px] border border-slate-200 p-5"><h3 class="font-bold flex items-center gap-2 font-display"><i data-lucide="shopping-basket" class="w-4 h-4"></i> Shopping list (demo)</h3><ul id="shoppingItems" class="mt-3 grid sm:grid-cols-2 gap-1.5 text-sm list-disc pl-5"></ul></div>
+<div id="shoppingList" class="hidden bg-white rounded-[20px] border border-slate-200 p-5"><h3 class="font-bold flex items-center gap-2 font-display"><i data-lucide="shopping-basket" class="w-4 h-4"></i> Shopping list</h3><ul id="shoppingItems" class="mt-3 grid sm:grid-cols-2 gap-1.5 text-sm list-disc pl-5"></ul></div>
 </section>
 
 <!-- WORKOUT -->
@@ -496,7 +498,7 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 <div class="grid lg:grid-cols-2 gap-4">
 <div class="bg-white rounded-[20px] border border-slate-200 p-5 space-y-4"><h3 class="font-bold font-display">Profile</h3><div id="settingsProfileSummary" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm"></div>
 <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3"><div id="settingsAvatar" class="w-14 h-14 rounded-2xl overflow-hidden bg-white border shrink-0 flex items-center justify-center"></div><div class="text-xs"><p class="font-bold">Profile picture</p><p class="text-slate-500">Auto avatar from gender • age • body, unless you uploaded one.</p><button onclick="showProfileSetupFromApp()" class="mt-1 text-xs font-bold text-teal underline">Change picture / profile</button></div></div>
-<div class="grid grid-cols-2 gap-2"><button onclick="showProfileSetupFromApp()" class="py-2.5 rounded-xl bg-teal text-white font-bold text-sm">Edit profile</button><button onclick="clearAllData()" class="py-2.5 rounded-xl bg-white border border-slate-200 font-semibold text-sm">Clear profile & data</button></div>
+<div class="grid grid-cols-2 gap-2"><button onclick="showProfileSetupFromApp()" class="py-2.5 rounded-xl bg-teal text-white font-bold text-sm">Edit profile</button><button onclick="clearAllData()" class="py-2.5 rounded-xl bg-white border border-slate-200 font-semibold text-sm">Clear profile & data</button><button onclick="signOut()" class="col-span-2 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-sm">Sign out</button></div>
 <div><label class="text-xs font-semibold">Units</label><div class="flex gap-2 mt-1"><button onclick="setUnits('metric'); renderAll()" id="sBtnMetric" class="flex-1 py-2 rounded-xl border font-semibold text-sm bg-teal text-white">Metric</button><button onclick="setUnits('imperial'); renderAll()" id="sBtnImperial" class="flex-1 py-2 rounded-xl border font-semibold text-sm bg-slate-50">Imperial</button></div></div>
 <label class="flex items-center gap-2 mt-2 text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"><input type="checkbox" id="reduceMotion" onchange="toggleReduceMotion(this.checked)"> Respect system setting + disable celebratory effects</label>
 </div>
@@ -509,10 +511,10 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 </div></div>
 <div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-semibold">Language (English default)</label><select onchange="setLang(this.value)" id="langSelect2" class="mt-1 w-full px-3 py-2.5 rounded-xl border bg-slate-50"><option value="en">English</option><option value="hi">हिन्दी</option></select></div><div><label class="text-xs font-semibold">Theme (fixed dark mode)</label><button onclick="toggleTheme()" class="mt-1 w-full py-2.5 rounded-xl border bg-slate-900 text-white font-semibold text-sm flex items-center justify-center gap-2"><i data-lucide="moon" class="w-4 h-4"></i> Toggle dark / light</button></div></div>
 <div class="bg-slate-900 text-white rounded-xl p-3 flex gap-3 items-center"><i data-lucide="moon" class="w-5 h-5 shrink-0"></i><p class="text-xs">Dark mode now fully supported — cards, inputs, charts & navigation adapt. Current: <b id="themeLabel">Light</b></p></div>
-<div class="bg-amber-50 border border-amber-200 rounded-xl p-3"><p class="text-xs font-bold text-amber-800">Demo profiles</p><div class="flex flex-wrap gap-1.5 mt-2"><button onclick="loadDemo('kids'); renderAll()" class="text-xs px-2.5 py-1.5 rounded-full bg-white border">Load Kids demo</button><button onclick="loadDemo('teens'); renderAll()" class="text-xs px-2.5 py-1.5 rounded-full bg-white border">Load Teens demo</button><button onclick="loadDemo('adults'); renderAll()" class="text-xs px-2.5 py-1.5 rounded-full bg-white border">Load Adults demo</button><button onclick="loadDemo('seniors'); renderAll()" class="text-xs px-2.5 py-1.5 rounded-full bg-white border">Load Seniors demo</button></div></div>
+
 </div>
 </div>
-<div class="bg-white rounded-[20px] border border-slate-200 p-5"><h3 class="font-bold flex items-center gap-2 font-display"><i data-lucide="shield-check" class="w-4 h-4 text-teal"></i> Privacy & safety</h3><div class="grid md:grid-cols-2 gap-4 mt-3 text-sm leading-relaxed"><div class="bg-teal-50 border border-teal/15 rounded-xl p-3"><p class="font-bold text-teal-dark">What stays on your device</p><p class="text-slate-600 text-xs mt-1">Name, age, photo (optional), height, weight, diet, allergies, health notes, hydration & workout logs — all in localStorage.</p></div><div class="bg-slate-50 border border-slate-200 rounded-xl p-3"><p class="font-bold">What may be sent externally</p><p class="text-slate-600 text-xs mt-1">VITA chat messages only. No profile data is sent automatically.</p></div></div><p class="text-xs text-slate-500 mt-3">VITALIS is for <b>general wellbeing</b> only. Water, BMI, BMR/TDEE, macros & calorie burn are <b>estimates</b>. This is <b>not medical advice</b>.</p></div>
+<div class="bg-white rounded-[20px] border border-slate-200 p-5"><h3 class="font-bold flex items-center gap-2 font-display"><i data-lucide="shield-check" class="w-4 h-4 text-teal"></i> Privacy & safety</h3><div class="grid md:grid-cols-2 gap-4 mt-3 text-sm leading-relaxed"><div class="bg-teal-50 border border-teal/15 rounded-xl p-3"><p class="font-bold text-teal-dark">What is saved to your account</p><p class="text-slate-600 text-xs mt-1">Profile, preferences, optional photo, hydration logs, workouts, and streaks are stored in your Supabase account.</p></div><div class="bg-slate-50 border border-slate-200 rounded-xl p-3"><p class="font-bold">What may be sent externally</p><p class="text-slate-600 text-xs mt-1">The app sends account data to Supabase to save and restore your account. Passwords are handled by Supabase Auth and are never stored in the app database.</p></div></div><p class="text-xs text-slate-500 mt-3">VITALIS is for <b>general wellbeing</b> only. Water, BMI, BMR/TDEE, macros & calorie burn are <b>estimates</b>. This is <b>not medical advice</b>.</p></div>
 </section>
 </main>
 </div>
@@ -556,10 +558,17 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 <div id="toast" class="hidden fixed bottom-24 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-sm font-semibold px-4 py-3 rounded-full shadow-lg"></div>
 
 <script>
-const defaultState={ user:null, profile:null, ageStyle:'adults', units:'metric', lang:'en', theme:'light', hydration:{ consumed:500, goal:2300, glasses:[true,true,false,false,false,false,false,false], scheduleDone:{} }, reduceMotion:false, reminders:false, servings:2, prepStyle:'standard', workoutLogs:[], streakMap:{}, profilePic:null, profilePicTemp:null };
-let state=JSON.parse(localStorage.getItem('vitalis_state')||'null')||{...defaultState, hydration:{...defaultState.hydration}, streakMap:{}};
-if(!state.workoutLogs) state.workoutLogs=[];
-if(!state.streakMap) state.streakMap={};
+// Configure these with the Project URL and publishable (anon) key from your Supabase project.
+const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY';
+const supabaseClient = window.supabase && !SUPABASE_URL.includes('YOUR_PROJECT_ID') && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+const defaultState={ user:null, profile:null, ageStyle:'adults', units:'metric', lang:'en', theme:'light', hydration:{ consumed:0, goal:2300, glasses:[false,false,false,false,false,false,false,false], scheduleDone:{} }, reduceMotion:false, reminders:false, servings:2, prepStyle:'standard', workoutLogs:[], streakMap:{}, profilePic:null, profilePicTemp:null };
+function freshState(user=null){ return {...defaultState,user,hydration:{...defaultState.hydration,glasses:[...defaultState.hydration.glasses],scheduleDone:{}},workoutLogs:[],streakMap:{}}; }
+let state=freshState();
+let currentUserId=null, loadingAccountId=null, loadingAccountPromise=null, cloudSaveTimer=null, cloudSaveQueue=Promise.resolve();
+let passwordRecoveryActive=false;
 let authMode='signin', currentStep=1, currentMealDay=0, mealData=[], chartInstance=null, burnChartInstance=null, timerInterval=null, timerSeconds=1200, timerRunning=false, currentRecipe=null, currentAudio=null, currentTrackIdx=-1, musicProgressInt=null;
 
 let demoProfiles={
@@ -627,27 +636,57 @@ seniors:{label:'Seniors • Gentle & uplifting',tracks:[
 {title:'Evening Serenity Piano',artist:'Gentle Keys',dur:'3:50',mood:'Cool-down',color:'from-sky-500 to-teal',audio:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3'}]}
 };
 
-function save(){ localStorage.setItem('vitalis_state', JSON.stringify(state)); }
-function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'),2400); }
-function todayStr(offset=0){ const d=new Date(); d.setDate(d.getDate()+offset); return d.toISOString().slice(0,10); }
-function seedStreak(){ if(Object.keys(state.streakMap).length>0) return; for(let i=13;i>=1;i--){ const ds=todayStr(-i); if(state.streakMap[ds]===undefined) state.streakMap[ds]=Math.random()>0.28; } save(); }
+function save(){
+ if(!currentUserId||!supabaseClient) return;
+ clearTimeout(cloudSaveTimer); const ownerId=currentUserId; const snapshot=JSON.parse(JSON.stringify(state));
+ cloudSaveTimer=setTimeout(()=>{ cloudSaveTimer=null; queueCloudSave(ownerId,snapshot); },650);
+}
+function queueCloudSave(ownerId,snapshot){
+ cloudSaveQueue=cloudSaveQueue.then(async()=>{
+  if(currentUserId!==ownerId) return;
+  try { const {error}=await supabaseClient.from('user_app_state').upsert({user_id:ownerId,state:snapshot,updated_at:new Date().toISOString()},{onConflict:'user_id'}); if(error) throw error; }
+  catch(error){ console.error('VITALIS account sync failed:',error); showToast('Could not sync your latest change. Check your connection and try again.'); }
+ });
+ return cloudSaveQueue;
+}
+async function flushCloudSave(){ if(cloudSaveTimer){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; if(currentUserId) await queueCloudSave(currentUserId,JSON.parse(JSON.stringify(state))); } await cloudSaveQueue; }
+function showAuthStatus(message,isError=false){ const el=document.getElementById('authStatus'); if(!el) return; el.textContent=message; el.classList.remove('hidden','bg-teal-50','border-teal/20','text-teal-dark','bg-rose-50','border-rose-200','text-rose-700'); el.classList.add(isError?'bg-rose-50':'bg-teal-50',isError?'border-rose-200':'border-teal/20',isError?'text-rose-700':'text-teal-dark'); }
+function showSignedOut(){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; currentUserId=null; loadingAccountId=null; loadingAccountPromise=null; state=freshState(); document.getElementById('app').classList.add('hidden'); document.getElementById('profileSetup').classList.add('hidden'); document.getElementById('loginScreen').classList.remove('hidden'); const pwd=document.getElementById('authPwd'); if(pwd) pwd.value=''; applyTheme(false); }
+async function loadAccount(session){
+ const user=session?.user; if(!user||!supabaseClient) return;
+ if(currentUserId===user.id) return;
+ if(loadingAccountId===user.id&&loadingAccountPromise) return loadingAccountPromise;
+ loadingAccountId=user.id;
+ loadingAccountPromise=(async()=>{
+  const {data,error}=await supabaseClient.from('user_app_state').select('state').eq('user_id',user.id).maybeSingle();
+  if(error) throw error; if(loadingAccountId!==user.id) return;
+  const saved=data?.state||{};
+  state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{}};
+  currentUserId=user.id; loadingAccountId=null; loadingAccountPromise=null;
+  applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
+  if(state.profile) showApp(true); else showProfileSetup();
+  if(!data) save();
+ })();
+ return loadingAccountPromise;
+}
+async function signOut(){ if(!supabaseClient){showAuthStatus('Connect this website to Supabase before signing in.',true);return;} try{await flushCloudSave();const {error}=await supabaseClient.auth.signOut();if(error)throw error;showSignedOut();showToast('You have been signed out.');}catch(error){console.error(error);showToast('Could not sign out. Please try again.');} }
+function todayStr(offset=0){ const d=new Date(); d.setDate(d.getDate()+offset); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); }
+function seedStreak(){}
 
-document.addEventListener('DOMContentLoaded', ()=>{
-lucide.createIcons();
-applyAgeStyle(state.ageStyle);
-applyTheme(false);
-setUnits(state.units,false);
-seedStreak();
-if(state.profile) showApp(true);
-document.getElementById('customMl').addEventListener('input', e=>{ document.getElementById('customMlLabel').textContent=e.target.value+' ml'; });
-document.getElementById('waterTargetRange').addEventListener('input', e=>{ document.getElementById('waterTargetLabel').textContent=e.target.value+' ml'; state.hydration.goal=parseInt(e.target.value); save(); renderHydration(); renderDashboard(); });
-document.getElementById('bmiToolH').addEventListener('input', updateBmiTool);
-document.getElementById('bmiToolW').addEventListener('input', updateBmiTool);
-document.getElementById('reduceMotion').checked=state.reduceMotion||window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-document.getElementById('waterTargetRange').value=state.hydration.goal;
-generateMeals(); renderAll(); updateAutoAvatarLive(); applyLang();
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushCloudSave();});
+document.addEventListener('DOMContentLoaded', async()=>{
+ lucide.createIcons(); applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false);
+ document.getElementById('customMl').addEventListener('input', e=>{ document.getElementById('customMlLabel').textContent=e.target.value+' ml'; });
+ document.getElementById('waterTargetRange').addEventListener('input', e=>{ document.getElementById('waterTargetLabel').textContent=e.target.value+' ml'; state.hydration.goal=parseInt(e.target.value); save(); renderHydration(); renderDashboard(); });
+ document.getElementById('bmiToolH').addEventListener('input', updateBmiTool); document.getElementById('bmiToolW').addEventListener('input', updateBmiTool);
+ document.getElementById('reduceMotion').checked=state.reduceMotion||window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ document.getElementById('waterTargetRange').value=state.hydration.goal; generateMeals(); renderAll(); updateAutoAvatarLive(); applyLang();
+ if(!supabaseClient){ showAuthStatus('Account sign-in is not configured yet. Add your Supabase Project URL and publishable key, then run docs/SUPABASE_SETUP.md.',true); return; }
+ supabaseClient.auth.onAuthStateChange((event,session)=>{ setTimeout(()=>{ if(event==='PASSWORD_RECOVERY'){showPasswordRecovery();return;} if(session) loadAccount(session).catch(error=>{console.error(error);showAuthStatus('Could not load your saved account data. Check the database setup.',true);}); else if(event==='SIGNED_OUT') showSignedOut(); },0); });
+ const {data,error}=await supabaseClient.auth.getSession();
+ if(error){ showAuthStatus('Could not connect to authentication. Check your Supabase configuration.',true); return; }
+ if(data.session&&!passwordRecoveryActive) await loadAccount(data.session).catch(error=>{console.error(error);showAuthStatus('Could not load your saved account data. Check the database setup.',true);});
 });
-
 /* THEME - FIXED DARK MODE */
 function applyTheme(icons=true){
 const dark=state.theme==='dark';
@@ -670,11 +709,32 @@ renderDashboard();
 }
 
 /* AUTH */
-function switchAuthTab(m){ authMode=m; document.getElementById('tabSignin').className=m==='signin'?'py-2.5 rounded-full bg-[#0F766E] text-white font-semibold text-sm shadow':'py-2.5 rounded-full text-slate-600 font-semibold text-sm'; document.getElementById('tabCreate').className=m==='create'?'py-2.5 rounded-full bg-[#0F766E] text-white font-semibold text-sm shadow':'py-2.5 rounded-full text-slate-600 font-semibold text-sm'; }
+function switchAuthTab(m){ authMode=m; document.getElementById('tabSignin').className=m==='signin'?'py-2.5 rounded-full bg-[#0F766E] text-white font-semibold text-sm shadow':'py-2.5 rounded-full text-slate-600 font-semibold text-sm'; document.getElementById('tabCreate').className=m==='create'?'py-2.5 rounded-full bg-[#0F766E] text-white font-semibold text-sm shadow':'py-2.5 rounded-full text-slate-600 font-semibold text-sm'; document.getElementById('authSubmitText').textContent=m==='create'?'Create account':'Sign in'; document.getElementById('authPwd').autocomplete=m==='create'?'new-password':'current-password'; document.getElementById('authStatus').classList.add('hidden'); }
 function togglePwd(){ const inp=document.getElementById('authPwd'); const isText=inp.type==='text'; inp.type=isText?'password':'text'; document.getElementById('pwdToggleText').textContent=isText?'Show':'Hide'; }
-function handleAuth(e){ e.preventDefault(); const email=document.getElementById('authEmail').value.trim(); const pwd=document.getElementById('authPwd').value; let ok=true; document.getElementById('errEmail').classList.add('hidden'); document.getElementById('errPwd').classList.add('hidden'); if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ document.getElementById('errEmail').textContent='Please enter a valid email (demo check).'; document.getElementById('errEmail').classList.remove('hidden'); ok=false; } if(!pwd||pwd.length<6){ document.getElementById('errPwd').textContent='Password must be at least 6 characters (demo).'; document.getElementById('errPwd').classList.remove('hidden'); ok=false; } if(!ok) return; state.user={email}; save(); showProfileSetup(); showToast(authMode==='create'?'Account created (demo) — let’s personalize!':'Welcome back (demo)!'); }
-function continueAsGuest(){ state.user={email:'guest@vitalis.demo'}; save(); showProfileSetup(); }
-
+async function handleAuth(e){
+ e.preventDefault(); const email=document.getElementById('authEmail').value.trim(); const password=document.getElementById('authPwd').value;
+ document.getElementById('errEmail').classList.add('hidden'); document.getElementById('errPwd').classList.add('hidden');
+ if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ document.getElementById('errEmail').textContent='Enter a valid email address.'; document.getElementById('errEmail').classList.remove('hidden'); return; }
+ if(!password||(authMode==='create'&&password.length<8)){ document.getElementById('errPwd').textContent=authMode==='create'?'Use a password with at least 8 characters.':'Enter your password.'; document.getElementById('errPwd').classList.remove('hidden'); return; }
+ if(!supabaseClient){ showAuthStatus('Account sign-in is not configured. Follow docs/SUPABASE_SETUP.md first.',true); return; }
+ const submit=document.getElementById('authSubmit'); submit.disabled=true; submit.classList.add('opacity-60');
+ try {
+  const result=authMode==='create'
+   ? await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:window.location.href.split(/[?#]/)[0]}})
+   : await supabaseClient.auth.signInWithPassword({email,password});
+  if(result.error) throw result.error;
+  if(authMode==='create'&&!result.data.session) showAuthStatus('Account created. Check your email to verify the address, then sign in.');
+  else showAuthStatus(authMode==='create'?'Account created. Complete your profile to get started.':'Signed in. Loading your saved account…');
+ } catch(error){ console.error('VITALIS authentication failed:',error); showAuthStatus(error.message||'Sign-in failed. Check your email and password.',true); }
+ finally { submit.disabled=false; submit.classList.remove('opacity-60'); }
+}
+function showPasswordRecovery(){ passwordRecoveryActive=true; document.getElementById('loginScreen').classList.remove('hidden'); document.getElementById('app').classList.add('hidden'); document.getElementById('profileSetup').classList.add('hidden'); document.getElementById('authForm').classList.add('hidden'); document.getElementById('passwordRecovery').classList.remove('hidden'); }
+async function completePasswordReset(){ const password=document.getElementById('newPassword').value; const status=document.getElementById('passwordRecoveryStatus'); status.classList.remove('hidden'); if(password.length<8){status.textContent='Use at least eight characters.';status.className='rounded-xl p-3 text-xs bg-rose-50 text-rose-700';return;} try{const {error}=await supabaseClient.auth.updateUser({password});if(error)throw error;document.getElementById('passwordRecovery').classList.add('hidden');document.getElementById('authForm').classList.remove('hidden');passwordRecoveryActive=false;document.getElementById('authPwd').value='';showAuthStatus('Password updated. Sign in with your new password.');await supabaseClient.auth.signOut();}catch(error){console.error(error);status.textContent=error.message||'Could not update the password.';status.className='rounded-xl p-3 text-xs bg-rose-50 text-rose-700';} }async function sendPasswordReset(){
+ const email=document.getElementById('authEmail').value.trim(); if(!email){ showAuthStatus('Enter your email address first, then choose Forgot password.',true); return; }
+ if(!supabaseClient){ showAuthStatus('Password reset is unavailable until Supabase is configured.',true); return; }
+ try { const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}); if(error) throw error; showAuthStatus('If an account exists for that email, password reset instructions have been sent.'); }
+ catch(error){ console.error(error); showAuthStatus(error.message||'Could not send password reset email.',true); }
+}
 /* AVATAR */
 function bmiCatForWidth(bmi){ if(bmi<18.5) return 30; if(bmi<25) return 38; if(bmi<30) return 48; return 56; }
 function avatarSVG(p, size=80){
@@ -705,7 +765,7 @@ if(!state.profilePicTemp && picPrev && !document.getElementById('inpPic')?.files
 renderHeaderAvatar();
 }
 function previewProfilePic(e){
-const f=e.target.files[0]; if(!f) return;
+const f=e.target.files[0]; if(!f) return; if(f.size>1048576){showToast('Please choose a profile photo under 1 MB.');e.target.value='';return;}
 const r=new FileReader(); r.onload=ev=>{ state.profilePicTemp=ev.target.result; document.getElementById('picPreview').innerHTML=`<img src="${state.profilePicTemp}" class="w-full h-full object-cover">`; showToast('Photo selected — will be saved on Finish'); }; r.readAsDataURL(f);
 }
 function clearProfilePic(){ state.profilePicTemp=null; document.getElementById('inpPic').value=''; updateAutoAvatarLive(); showToast('Switched to auto animated avatar'); }
@@ -719,13 +779,12 @@ const sAv=document.getElementById('settingsAvatar'); if(sAv){ sAv.innerHTML= pic
 }
 
 /* DEMO */
-function loadDemo(type){ const p=demoProfiles[type]; state.profile={...p}; state.profilePic=null; state.profilePicTemp=null; state.ageStyle=type; state.hydration.goal=calcWater(p); state.hydration.glasses=[true,true,false,false,false,false,false,false]; state.hydration.consumed=500; save(); applyAgeStyle(type); seedStreak(); if(!document.getElementById('loginScreen').classList.contains('hidden')){ showProfileSetup(); setTimeout(()=>prefillProfileForm(p),100); showToast('Demo loaded — you can edit before finishing'); } else { generateMeals(); renderAll(); showToast('Loaded '+p.name+' demo — '+type); } }
 function prefillProfileForm(p){ document.getElementById('inpName').value=p.name; document.getElementById('inpAge').value=p.age; document.querySelector(`input[name="sex"][value="${p.sex}"]`).checked=true; document.getElementById('inpHeight').value=Math.round(p.height); document.getElementById('inpWeight').value=Math.round(p.weight); document.getElementById('inpActivity').value=p.activity; document.querySelector(`input[name="climate"][value="${p.climate}"]`).checked=true; document.getElementById('inpDiet').value=p.diet; document.getElementById('inpBudget').value=p.budget; document.getElementById('inpCuisine').value=p.cuisine; document.getElementById('inpSleep').value=p.sleep; document.getElementById('inpGoal').value=p.goal; document.getElementById('inpHealth').value=p.health||''; selectAgeStyle(state.ageStyle); updateAutoAvatarLive(); }
 
 /* STEPS */
 function showProfileSetup(){ document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('app').classList.add('hidden'); document.getElementById('profileSetup').classList.remove('hidden'); currentStep=1; updateStepUI(); window.scrollTo(0,0); lucide.createIcons(); updateAutoAvatarLive(); }
 function showProfileSetupFromApp(){ showProfileSetup(); if(state.profile) prefillProfileForm(state.profile); if(state.profilePic){ document.getElementById('picPreview').innerHTML=`<img src="${state.profilePic}" class="w-full h-full object-cover">`; } }
-function clearProfileAndBack(){ document.getElementById('profileSetup').classList.add('hidden'); document.getElementById('loginScreen').classList.remove('hidden'); }
+function clearProfileAndBack(){ if(state.profile){showApp(true);return;} signOut(); }
 function updateStepUI(){ for(let i=1;i<=4;i++) document.getElementById('step'+i).classList.toggle('hidden', i!==currentStep); document.getElementById('stepNum').textContent=currentStep; document.getElementById('stepLabel').textContent=`STEP ${currentStep} OF 4 • ${['BASICS','BODY','PREFERENCES','WELLNESS'][currentStep-1]}`; document.getElementById('progressBar').style.width=(currentStep*25)+'%'; document.getElementById('btnPrev').classList.toggle('hidden', currentStep===1); document.getElementById('btnNext').classList.toggle('hidden', currentStep===4); document.getElementById('btnFinish').classList.toggle('hidden', currentStep!==4); document.getElementById('btnSkip').classList.toggle('hidden', currentStep!==4); for(let i=2;i<=4;i++){ const el=document.getElementById('dot'+i); if(el) el.className=i<=currentStep?'px-2 py-1 rounded-full bg-teal text-white font-semibold':'px-2 py-1 rounded-full bg-slate-100 text-slate-500 font-semibold'; } }
 function nextStep(){ if(currentStep===1){ const name=document.getElementById('inpName').value.trim(); const age=parseInt(document.getElementById('inpAge').value); if(name.length<2){ document.getElementById('errName').classList.remove('hidden'); return; } else document.getElementById('errName').classList.add('hidden'); if(!age||age<3||age>100){ showToast('Please enter a valid age (3–100)'); return; } } if(currentStep===2){ const h=parseFloat(document.getElementById('inpHeight').value); const w=parseFloat(document.getElementById('inpWeight').value); if(!h||!w){ showToast('Please enter height and weight'); return; } } currentStep=Math.min(4,currentStep+1); updateStepUI(); }
 function prevStep(){ currentStep=Math.max(1,currentStep-1); updateStepUI(); }
@@ -737,9 +796,9 @@ function applyAgeStyle(style){ document.body.classList.remove('age-kids','age-te
 
 function setUnits(u, doSave=true){ state.units=u; if(doSave) save(); const isMetric=u==='metric'; ['btnMetric','sBtnMetric'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.classList.toggle('bg-teal',isMetric); el.classList.toggle('text-white',isMetric); }}); ['btnImperial','sBtnImperial'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.classList.toggle('bg-teal',!isMetric); el.classList.toggle('text-white',!isMetric); }}); const lh=document.getElementById('labelHeight'); if(lh) lh.textContent=isMetric?'Height (cm) *':'Height (inches) *'; const lw=document.getElementById('labelWeight'); if(lw) lw.textContent=isMetric?'Weight (kg) *':'Weight (lbs) *'; }
 
-function finishProfile(){ const name=document.getElementById('inpName').value.trim(); const age=parseInt(document.getElementById('inpAge').value); if(!name||name.length<2||!age){ showToast('Please complete required fields'); return; } let height=parseFloat(document.getElementById('inpHeight').value); let weight=parseFloat(document.getElementById('inpWeight').value); if(state.units==='imperial'){ height=height*2.54; weight=weight*0.453592; } const profile={ name, age, sex:document.querySelector('input[name="sex"]:checked').value, height, weight, activity:document.getElementById('inpActivity').value, climate:document.querySelector('input[name="climate"]:checked').value, diet:document.getElementById('inpDiet').value, allergies:Array.from(document.querySelectorAll('.allergy:checked')).map(c=>c.value), budget:document.getElementById('inpBudget').value, cuisine:document.getElementById('inpCuisine').value, sleep:parseFloat(document.getElementById('inpSleep').value)||7.5, goal:document.getElementById('inpGoal').value, health:document.getElementById('inpHealth').value.trim(), meds:document.getElementById('inpMeds').value.trim() }; state.profile=profile; if(state.profilePicTemp) state.profilePic=state.profilePicTemp; state.profilePicTemp=null; state.hydration.goal=calcWater(profile); state.hydration.consumed=Math.round(state.hydration.goal*0.22); save(); generateMeals(); showApp(); showToast('Profile saved — welcome, '+name+'! '+(state.profilePic?'Photo saved.':'Auto avatar created ✨')); }
+function finishProfile(){ if(!currentUserId){showToast('Please sign in before saving your profile.');return;} const name=document.getElementById('inpName').value.trim(); const age=parseInt(document.getElementById('inpAge').value); if(!name||name.length<2||!age){ showToast('Please complete required fields'); return; } let height=parseFloat(document.getElementById('inpHeight').value); let weight=parseFloat(document.getElementById('inpWeight').value); if(state.units==='imperial'){ height=height*2.54; weight=weight*0.453592; } const profile={ name, age, sex:document.querySelector('input[name="sex"]:checked').value, height, weight, activity:document.getElementById('inpActivity').value, climate:document.querySelector('input[name="climate"]:checked').value, diet:document.getElementById('inpDiet').value, allergies:Array.from(document.querySelectorAll('.allergy:checked')).map(c=>c.value), budget:document.getElementById('inpBudget').value, cuisine:document.getElementById('inpCuisine').value, sleep:parseFloat(document.getElementById('inpSleep').value)||7.5, goal:document.getElementById('inpGoal').value, health:document.getElementById('inpHealth').value.trim(), meds:document.getElementById('inpMeds').value.trim() }; state.profile=profile; if(state.profilePicTemp) state.profilePic=state.profilePicTemp; state.profilePicTemp=null; state.hydration.goal=calcWater(profile); state.hydration.consumed=0; state.hydration.glasses=Array.from({length:Math.ceil(state.hydration.goal/250)},()=>false); save(); generateMeals(); showApp(); showToast('Profile saved — welcome, '+name+'! '+(state.profilePic?'Photo saved.':'Auto avatar created ✨')); }
 function showApp(silent){ document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('profileSetup').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); renderAll(); window.scrollTo(0,0); lucide.createIcons(); }
-function clearAllData(){ if(confirm('Clear profile, hydration logs and preferences from this device?')){ const theme=state.theme, lang=state.lang, style=state.ageStyle; localStorage.removeItem('vitalis_state'); state={...defaultState, theme, lang, ageStyle:style, hydration:{...defaultState.hydration}, workoutLogs:[], streakMap:{}}; save(); document.getElementById('app').classList.add('hidden'); document.getElementById('loginScreen').classList.remove('hidden'); applyTheme(); showToast('Cleared — data removed from this device'); } }
+async function clearAllData(){ if(!currentUserId||!confirm('Clear your saved profile and activity from this account? Your account will remain active.')) return; try { await flushCloudSave(); const {error}=await supabaseClient.from('user_app_state').delete().eq('user_id',currentUserId); if(error) throw error; const user=state.user; state=freshState(user); generateMeals(); showProfileSetup(); showToast('Account data cleared. Set up your profile again.'); } catch(error){ console.error(error); showToast('Could not clear account data. Please try again.'); } }
 
 /* CALCS */
 function calcBmi(p){ const h=p.height/100; return p.weight/(h*h); }
@@ -1100,5 +1159,13 @@ box.scrollTop=box.scrollHeight;
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
 
 
