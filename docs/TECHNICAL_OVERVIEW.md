@@ -2,7 +2,7 @@
 
 ## Application
 
-The VITALIS frontend is a single-page HTML application. Tailwind CSS, Lucide, Chart.js, Google Fonts, and Supabase JS are loaded from CDNs. Supabase URL and publishable/anon key are configured as public browser values in `index.html`; a service-role key must never be included in frontend code.
+The VITALIS frontend is a single-page static web app organized across `index.html`, `css/styles.css`, and JavaScript files under `js/`. Tailwind CSS, Lucide, Chart.js, Google Fonts, and Supabase JS load from CDNs. The Tailwind theme setup is in `js/tailwind-config.js`; app behavior and the Supabase URL plus publishable/anon key are in `js/app.js`. These are public browser values; a service-role key must never be included in frontend code.
 
 ## Authentication
 
