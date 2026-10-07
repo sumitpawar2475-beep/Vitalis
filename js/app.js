@@ -122,10 +122,10 @@ document.addEventListener('DOMContentLoaded', async()=>{
  document.getElementById('reduceMotion').checked=state.reduceMotion||window.matchMedia('(prefers-reduced-motion: reduce)').matches;
  document.getElementById('waterTargetRange').value=state.hydration.goal; generateMeals(); renderAll(); updateAutoAvatarLive(); applyLang();
  if(!supabaseClient){ showAuthStatus('Account sign-in is not configured yet. Add your Supabase Project URL and publishable key, then run docs/SUPABASE_SETUP.md.',true); return; }
- supabaseClient.auth.onAuthStateChange((event,session)=>{ setTimeout(()=>{ if(event==='PASSWORD_RECOVERY'){showPasswordRecovery();return;} if(session) loadAccount(session).catch(error=>{console.error(error);showAuthStatus('Could not load your saved account data. Check the database setup.',true);}); else if(event==='SIGNED_OUT') showSignedOut(); },0); });
+ supabaseClient.auth.onAuthStateChange((event,session)=>{ setTimeout(()=>{ if(event==='PASSWORD_RECOVERY'){showPasswordRecovery();return;} if(session) loadAccount(session).catch(error=>{console.error(error);showAuthStatus('Could not load your saved account data. Check the database setup or browser console.',true);}); else if(event==='SIGNED_OUT') showSignedOut(); },0); });
  const {data,error}=await supabaseClient.auth.getSession();
  if(error){ showAuthStatus('Could not connect to authentication. Check your Supabase configuration.',true); return; }
- if(data.session&&!passwordRecoveryActive) await loadAccount(data.session).catch(error=>{console.error(error);showAuthStatus('Could not load your saved account data. Check the database setup.',true);});
+ if(data.session&&!passwordRecoveryActive) await loadAccount(data.session).catch(error=>{console.error(error);showAuthStatus('Could not load your saved account data. Check the database setup or browser console.',true);});
 });
 /* THEME - FIXED DARK MODE */
 function applyTheme(icons=true){
@@ -311,6 +311,8 @@ renderStreakCalendar(); updateBmiTool(true); renderWorkoutPreviewChip();
 }
 function drawMacroChart(split){
 const ctx=document.getElementById('macroChart'); if(!ctx) return;
+// Theme changes can redraw the chart outside renderDashboard, so restore the current split if omitted.
+split=split||macroSplit((state.profile||demoProfiles.adults).goal);
 if(chartInstance) chartInstance.destroy();
 const dark=state.theme==='dark';
 chartInstance=new Chart(ctx,{type:'doughnut',data:{labels:['Carbs','Protein','Fat'],datasets:[{data:[split.c,split.p,split.f],backgroundColor:['#0F766E','#FF6B5A','#FBBF24'],borderWidth:dark?2:0,borderColor:dark?'#13273E':'#fff'}]},options:{cutout:'68%',plugins:{legend:{display:false}}}});
