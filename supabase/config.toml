@@ -1,0 +1,2 @@
+[functions.send-hydration-reminders]
+verify_jwt = false

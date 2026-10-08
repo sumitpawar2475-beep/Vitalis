@@ -1,6 +1,8 @@
 // Configure these with the Project URL and publishable (anon) key from your Supabase project.
 const SUPABASE_URL = 'https://eqsqbjqemjxsaixmffqf.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_I7A_OzeOZq-LRAbdB0U2EA_ok3rK2eO';
+// Safe to publish; replace with the PUBLIC key generated in docs/PUSH_REMINDERS_SETUP.md.
+const VITALIS_PUSH_PUBLIC_KEY = 'PASTE_PUBLIC_VAPID_KEY_HERE';
 const supabaseClient = window.supabase && !SUPABASE_URL.includes('YOUR_PROJECT_ID') && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
@@ -105,6 +107,7 @@ async function loadAccount(session){
   currentUserId=user.id; loadingAccountId=null; loadingAccountPromise=null;
   applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
   if(state.profile) showApp(true); else showProfileSetup();
+  if(state.reminders && state.profile) syncExistingHydrationPush();
   if(!data) save();
  })();
  return loadingAccountPromise;
@@ -391,7 +394,75 @@ function addGlass(n){ const h=state.hydration; if(n>0){ h.consumed+=250; celebra
 function toggleGlass(i){ const h=state.hydration; const wasFull=!!h.glasses[i]; h.consumed=Math.max(0,h.consumed+(wasFull?-250:250)); if(h.consumed>=h.goal) celebrate(); finishWaterUpdate(); }
 function addCustom(){ const ml=Number(document.getElementById('customMl').value); if(!Number.isFinite(ml)||ml<=0){ showToast('Choose a valid amount'); return; } state.hydration.consumed+=ml; if(state.hydration.consumed>=state.hydration.goal) celebrate(); finishWaterUpdate(); showToast(`+${ml} ml logged 💧`); }
 function resetHydration(){ state.hydration.consumed=0; state.hydration.glasses=Array.from({length:Math.max(1,Math.ceil(state.hydration.goal/250))},()=>false); state.hydration.scheduleDone={}; save(); renderHydration(); renderDashboard(); }
-function toggleReminders(v){ state.reminders=v; save(); showToast(v?'Reminders ON (demo) 🔔':'Reminders OFF'); }
+function vitalisBase64UrlToBytes(value){
+ const padded=value.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-value.length%4)%4);
+ return Uint8Array.from(atob(padded),c=>c.charCodeAt(0));
+}
+function currentHydrationTimeZone(){ return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'; }
+async function saveHydrationPushSubscription(subscription){
+ const userId=currentUserId;
+ if(!userId||!supabaseClient) throw new Error('Sign in before enabling reminders.');
+ const subscriptionJson=subscription.toJSON();
+ if(!subscriptionJson.keys?.p256dh||!subscriptionJson.keys?.auth) throw new Error('This browser returned an incomplete push subscription.');
+ const {error}=await supabaseClient.from('push_subscriptions').upsert({
+  user_id:userId,
+  endpoint:subscription.endpoint,
+  subscription_json:subscriptionJson,
+  time_zone:currentHydrationTimeZone(),
+ },{onConflict:'user_id,endpoint'});
+ if(error) throw error;
+}
+async function syncExistingHydrationPush(){
+ if(!state.reminders||!currentUserId||!supabaseClient||typeof Notification==='undefined'||Notification.permission!=='granted'||!('serviceWorker' in navigator)||!('PushManager' in window)||!VITALIS_PUSH_PUBLIC_KEY||VITALIS_PUSH_PUBLIC_KEY.includes('PASTE_')) return;
+ try{
+  const registration=await navigator.serviceWorker.register('/service-worker.js');
+  const subscription=await registration.pushManager.getSubscription();
+  if(subscription) await saveHydrationPushSubscription(subscription);
+ }catch(error){ console.warn('Could not refresh VITALIS push reminder registration:',error); }
+}
+async function toggleReminders(enabled){
+ const toggle=document.getElementById('reminderToggle');
+ if(!enabled){
+  state.reminders=false; save();
+  try{
+   await flushCloudSave();
+   if(currentUserId&&supabaseClient&&'serviceWorker' in navigator){
+    const registration=await navigator.serviceWorker.getRegistration('/');
+    const subscription=await registration?.pushManager.getSubscription();
+    if(subscription){
+     const {error}=await supabaseClient.from('push_subscriptions').delete().eq('user_id',currentUserId).eq('endpoint',subscription.endpoint);
+     if(error) throw error;
+     await subscription.unsubscribe();
+    }
+   }
+   showToast('Hydration reminders turned off.');
+  }catch(error){
+   console.error('Could not fully remove this device from hydration reminders:',error);
+   showToast('Reminders are off in VITALIS. This device could not be unregistered.');
+  }
+  if(toggle) toggle.checked=false;
+  return;
+ }
+ try{
+  if(!currentUserId||!supabaseClient) throw new Error('Sign in to your VITALIS account first.');
+  if(!window.isSecureContext) throw new Error('Notifications need the secure HTTPS website address.');
+  if(typeof Notification==='undefined'||!('serviceWorker' in navigator)||!('PushManager' in window)) throw new Error('This browser does not support web push notifications.');
+  if(!VITALIS_PUSH_PUBLIC_KEY||VITALIS_PUSH_PUBLIC_KEY.includes('PASTE_')) throw new Error('Push reminders need one-time setup. See docs/PUSH_REMINDERS_SETUP.md.');
+  const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
+  if(permission!=='granted') throw new Error('Allow notifications in your browser to receive hydration reminders.');
+  const registration=await navigator.serviceWorker.register('/service-worker.js');
+  let subscription=await registration.pushManager.getSubscription();
+  if(!subscription) subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:vitalisBase64UrlToBytes(VITALIS_PUSH_PUBLIC_KEY)});
+  await saveHydrationPushSubscription(subscription);
+  state.reminders=true; save(); await flushCloudSave();
+  if(toggle) toggle.checked=true;
+  showToast('Hydration reminders are on for this device.');
+ }catch(error){
+  state.reminders=false; save(); if(toggle) toggle.checked=false;
+  console.error('Could not enable VITALIS hydration reminders:',error);
+  showToast(error?.message||'Could not enable reminders. Check your notification settings and setup.');
+ }
+}
 function celebrate(){ if(state.reduceMotion) return; if(state.ageStyle==='kids'){ for(let i=0;i<24;i++){ const c=document.createElement('div'); c.className='confetti'; c.style.left=Math.random()*100+'vw'; c.style.background=['#FF6B5A','#FFD93D','#6BCB77','#4D96FF','#B983FF'][i%5]; c.style.borderRadius=Math.random()>0.5?'50%':'4px'; document.body.appendChild(c); setTimeout(()=>c.remove(),1500); } } }
 
 /* MEALS */
