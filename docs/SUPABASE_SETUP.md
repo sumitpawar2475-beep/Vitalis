@@ -42,3 +42,14 @@ The browser keeps the Supabase Auth session so a user can remain signed in betwe
 - Confirm a second account cannot read or change the first account's row.
 - Review privacy notices, account deletion and data-retention practices, email delivery, backups, and applicable consent requirements.
 - Do not describe BMI, water, nutrition, or calorie estimates as diagnosis or treatment.
+
+
+## Vitalis Communities profiles and photos
+
+After updating the site, run the complete `../supabase/schema.sql` again in the Supabase SQL Editor. It is designed to be re-run and adds the community profile tables, row-level security policies, a private `community-media` storage bucket, and a database-enforced 12-photo limit.
+
+Members create a unique Vitalis username in Communities. A profile is private and excluded from search until its owner checks **Make my profile searchable**. Searchable profiles show only the username, display name, optional bio, profile photo, and photos the member adds to the grid. Health, hydration, meals, workouts, and fitness scores are not copied into public community records.
+
+Community images are restricted to JPG, PNG, or WebP and 5 MB each. Members can view their own photos; other signed-in members can view them only while the owner's profile is searchable. Turning discoverability off removes the profile from search and blocks newly issued photo links. Existing signed links may remain valid for up to five minutes.
+
+To test the feature, sign in with two accounts: create and make one profile searchable, then search its username from the other account. Confirm that a private profile cannot be found and that only the owner can add or remove photos.
