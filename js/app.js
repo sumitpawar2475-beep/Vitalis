@@ -405,8 +405,8 @@ function renderAll(){ if(state.profile){ const h=document.getElementById('bmiToo
 function renderDashboard(){
 const p=state.profile||demoProfiles.adults;
 const hi=state.lang==='hi';
-document.getElementById('headerName').textContent=p.name;
-document.getElementById('headerSub').textContent=`${p.goal} • ${p.age}y • ${p.diet}`;
+const headerName=document.getElementById('headerName'); if(headerName) headerName.textContent=p.name;
+const headerSub=document.getElementById('headerSub'); if(headerSub) headerSub.textContent=`${p.goal} • ${p.age}y • ${p.diet}`;
 const hour=new Date().getHours(); const greet=hour<12?(hi?'सुप्रभात':'Good morning'):hour<17?(hi?'नमस्ते':'Good afternoon'):(hi?'शुभ संध्या':'Good evening');
 document.getElementById('dashGreetingEyebrow').textContent=`${greet.toUpperCase()} • ${new Date().toLocaleDateString(state.lang==='hi'?'hi-IN':'en-US',{weekday:'long'}).toUpperCase()}`;
 const tone=state.ageStyle==='kids'?'Ready for a splashy, healthy day? 🌈':state.ageStyle==='teens'?'Your vibe, your pace — let’s make it balanced ⚡':state.ageStyle==='seniors'?'Gentle steps for a steady, comfortable day ☀️':'Small steps today? ✨';
