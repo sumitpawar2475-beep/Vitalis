@@ -288,3 +288,28 @@ body.dark-active .communityPostComposer{background:linear-gradient(145deg,#201B3
 body.dark-active .communityPostType.blog{background:#34265F;color:#DDD6FE}
 body.dark-active .communityPostType.achievement{background:#493124;color:#FED7AA}
 @media(max-width:640px){.communityOwnHeader,.communityViewedHeader{align-items:flex-start;gap:14px}.communityOwnAvatar{width:88px;height:88px;font-size:25px}.communityViewedAvatar{width:78px;height:78px}.communityOwnName{font-size:19px}.communityOwnStats{gap:7px}.communityOwnStats article{gap:7px;padding:9px}.communityStatIcon{width:31px;height:31px}.communityStatValue{font-size:18px}.communityStatHint{font-size:9px}.communityEditProfileButton{min-height:38px;padding:7px 12px}.communityCreateMenu{min-width:195px}.communityViewedStats{gap:7px}.communityPhotoGrid{gap:7px}}
+
+/* Keep the Vitalis Health dashboard in a stable desktop two-column layout. */
+#app:not(.community-mode) .appLayout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+}
+@media (min-width:1024px){
+  #app:not(.community-mode) .appLayout{
+    grid-template-columns:220px minmax(0,1fr);
+    align-items:start;
+  }
+  #app:not(.community-mode) .appLayout>nav{
+    grid-column:1;
+    min-width:0;
+  }
+  #app:not(.community-mode) .appLayout>main{
+    grid-column:2;
+    min-width:0;
+    width:100%;
+  }
+}
+@media (max-width:1023.98px){
+  #app:not(.community-mode) .appLayout>main{min-width:0}
+}
+
