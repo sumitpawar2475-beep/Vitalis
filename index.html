@@ -98,14 +98,7 @@
 <div><label class="text-xs font-semibold">Age *</label><input id="inpAge" type="number" min="3" max="100" placeholder="e.g., 24" class="mt-1 w-full px-3 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-teal focus:ring-4 focus:ring-teal/10 outline-none" oninput="updateAutoAvatarLive()"><p class="text-[11px] text-slate-400 mt-1">Used to suggest an age style — you can change it anytime.</p></div>
 </div>
 <div><label class="text-xs font-semibold">Sex</label><div class="grid grid-cols-3 gap-2 mt-1"><label class="cursor-pointer"><input type="radio" name="sex" value="female" class="peer sr-only" checked onchange="updateAutoAvatarLive()"><div class="peer-checked:bg-teal peer-checked:text-white peer-checked:border-teal border border-slate-200 rounded-xl py-3 text-center text-sm font-semibold bg-slate-50">Female</div></label><label class="cursor-pointer"><input type="radio" name="sex" value="male" class="peer sr-only" onchange="updateAutoAvatarLive()"><div class="peer-checked:bg-teal peer-checked:text-white peer-checked:border-teal border border-slate-200 rounded-xl py-3 text-center text-sm font-semibold bg-slate-50">Male</div></label><label class="cursor-pointer"><input type="radio" name="sex" value="other" class="peer sr-only" onchange="updateAutoAvatarLive()"><div class="peer-checked:bg-teal peer-checked:text-white peer-checked:border-teal border border-slate-200 rounded-xl py-3 text-center text-sm font-semibold bg-slate-50">Other</div></label></div></div>
-<div class="bg-teal-50 border border-teal/15 rounded-xl p-4"><p class="text-sm font-bold text-teal-dark flex items-center gap-2"><i data-lucide="palette" class="w-4 h-4"></i> Choose your VITALIS style</p><p class="text-xs text-slate-600 mt-1">Same features & guidance — only the look, font and motion changes. You can switch anytime in Settings.</p>
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
-<button onclick="selectAgeStyle('kids')" data-style="kids" class="agePick text-left p-3 rounded-2xl border-2 border-teal bg-white shadow"><p class="text-2xl">🌈</p><p class="font-extrabold text-sm">Kids</p><p class="text-[11px] text-slate-500">Nunito • bouncy • playful</p></button>
-<button onclick="selectAgeStyle('teens')" data-style="teens" class="agePick text-left p-3 rounded-2xl border border-slate-200 bg-slate-50"><p class="text-2xl">⚡</p><p class="font-extrabold text-sm">Teens</p><p class="text-[11px] text-slate-500">Outfit • bold • slide</p></button>
-<button onclick="selectAgeStyle('adults')" data-style="adults" class="agePick text-left p-3 rounded-2xl border border-slate-200 bg-slate-50"><p class="text-2xl">✦</p><p class="font-extrabold text-sm">Adults</p><p class="text-[11px] text-slate-500">Jakarta • calm • fade</p></button>
-<button onclick="selectAgeStyle('seniors')" data-style="seniors" class="agePick text-left p-3 rounded-2xl border border-slate-200 bg-slate-50"><p class="text-2xl">☀️</p><p class="font-extrabold text-sm">Seniors</p><p class="text-[11px] text-slate-500">Lexend • clear • gentle</p></button>
-</div></div>
-</div>
+<p class="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">Your initial appearance follows your age group. Change the VITALIS style anytime in Settings.</p></div>
 <div id="step2" class="hidden space-y-5">
 <div class="flex items-center justify-between"><h3 class="text-xl font-extrabold font-display">Body & activity</h3><div class="flex items-center gap-1 p-1 bg-slate-100 rounded-full text-xs font-semibold"><button onclick="setUnits('metric')" id="btnMetric" class="px-3 py-1.5 rounded-full bg-teal text-white">Metric</button><button onclick="setUnits('imperial')" id="btnImperial" class="px-3 py-1.5 rounded-full text-slate-600">Imperial</button></div></div>
 <div class="grid sm:grid-cols-2 gap-4"><div><label class="text-xs font-semibold" id="labelHeight">Height (cm) *</label><input id="inpHeight" type="number" placeholder="e.g., 165" oninput="updateAutoAvatarLive()" class="mt-1 w-full px-3 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-teal focus:ring-4 focus:ring-teal/10 outline-none"></div><div><label class="text-xs font-semibold" id="labelWeight">Weight (kg) *</label><input id="inpWeight" type="number" placeholder="e.g., 60" oninput="updateAutoAvatarLive()" class="mt-1 w-full px-3 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-teal focus:ring-4 focus:ring-teal/10 outline-none"></div></div>
@@ -143,29 +136,19 @@
 <header class="sticky top-0 z-30 bg-white/90 glass border-b border-slate-200">
 <div class="max-w-[1280px] mx-auto px-4 lg:px-6 h-[64px] flex items-center gap-4">
 <div class="flex items-center gap-3"><div class="w-9 h-9 rounded-xl bg-teal flex items-center justify-center text-white shadow"><i data-lucide="droplets" class="w-5 h-5"></i></div><div class="leading-none"><p class="font-extrabold tracking-tight text-[15px] font-display">VITALIS</p><p class="text-[10px] tracking-[0.14em] font-bold text-slate-400">SDG 3 • WELLBEING</p></div><span class="hidden sm:inline-flex ml-2 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">ACCOUNT</span></div>
-<div class="hidden lg:flex items-center gap-1.5 ml-6"><span class="text-xs font-semibold text-slate-500 mr-1">Style:</span>
-<button onclick="selectAgeStyle('kids')" data-style-nav="kids" class="styleNav px-3 py-1.5 rounded-full border text-xs font-bold">🌈 Kids</button>
-<button onclick="selectAgeStyle('teens')" data-style-nav="teens" class="styleNav px-3 py-1.5 rounded-full border text-xs font-bold">⚡ Teens</button>
-<button onclick="selectAgeStyle('adults')" data-style-nav="adults" class="styleNav px-3 py-1.5 rounded-full bg-teal text-white border-teal text-xs font-bold">✦ Adults</button>
-<button onclick="selectAgeStyle('seniors')" data-style-nav="seniors" class="styleNav px-3 py-1.5 rounded-full border text-xs font-bold">☀️ Seniors</button>
+<div class="hidden lg:flex items-center gap-2 ml-5" role="group" aria-label="App mode">
+<button id="modeVitalis" onclick="setAppMode('vitalis')" class="modeToggle px-4 py-2 rounded-full border border-teal bg-teal text-white text-xs font-bold" aria-pressed="true">💧 Vitalis</button>
+<button id="modeCommunities" onclick="setAppMode('communities')" class="modeToggle px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-bold hover:border-teal">✦ Vitalis Communities</button>
 </div>
-<div class="ml-auto flex items-center gap-2">
-<select id="langSelect" onchange="setLang(this.value)" class="hidden sm:block text-xs font-semibold px-2.5 py-2 rounded-full border border-slate-200 bg-white"><option value="en">English</option><option value="hi">हिन्दी</option></select>
-<button onclick="toggleTheme()" id="themeBtn" class="w-9 h-9 rounded-full border border-slate-200 bg-white flex items-center justify-center"><i data-lucide="moon" class="w-4 h-4"></i></button>
-<div class="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200 ml-1"><div id="avatarWrap" class="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center"></div><div class="leading-none hidden md:block text-left"><p id="headerName" class="text-sm font-bold">Priya</p><p id="headerSub" class="text-[11px] text-slate-500">Balanced • 34y</p></div></div>
-<button onclick="showProfileSetupFromApp()" class="hidden sm:inline-flex text-xs font-semibold px-3 py-2 rounded-full bg-slate-900 text-white">Edit profile</button>
-</div>
-</div>
-<div class="lg:hidden px-4 pb-3 flex gap-1.5 overflow-auto">
-<button onclick="selectAgeStyle('kids')" data-style-nav-m="kids" class="styleNavM shrink-0 px-3 py-1.5 rounded-full border text-xs font-bold bg-white">🌈 Kids</button>
-<button onclick="selectAgeStyle('teens')" data-style-nav-m="teens" class="styleNavM shrink-0 px-3 py-1.5 rounded-full border text-xs font-bold bg-white">⚡ Teens</button>
-<button onclick="selectAgeStyle('adults')" data-style-nav-m="adults" class="styleNavM shrink-0 px-3 py-1.5 rounded-full bg-teal text-white border-teal text-xs font-bold">✦ Adults</button>
-<button onclick="selectAgeStyle('seniors')" data-style-nav-m="seniors" class="styleNavM shrink-0 px-3 py-1.5 rounded-full border text-xs font-bold bg-white">☀️ Seniors</button>
+<div class="lg:hidden px-4 pb-3 flex gap-2 overflow-auto" role="group" aria-label="App mode">
+<button id="modeVitalisMobile" onclick="setAppMode('vitalis')" class="modeToggle shrink-0 px-3 py-2 rounded-full border border-teal bg-teal text-white text-xs font-bold" aria-pressed="true">💧 Vitalis</button>
+<button id="modeCommunitiesMobile" onclick="setAppMode('communities')" class="modeToggle shrink-0 px-3 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-bold">✦ Vitalis Communities</button>
 <select onchange="setLang(this.value)" class="ml-auto text-xs font-semibold px-2 py-1.5 rounded-full border bg-white"><option value="en">EN</option><option value="hi">HI</option></select>
 </div>
+
 </header>
 
-<div class="max-w-[1280px] mx-auto px-4 lg:px-6 py-4 lg:py-6 grid lg:grid-cols-[220px_1fr] gap-6">
+<div class="appLayout max-w-[1280px] mx-auto px-4 lg:px-6 py-4 lg:py-6 grid lg:grid-cols-[220px_1fr] gap-6">
 <nav class="hidden lg:block sticky top-[76px] h-fit">
 <div class="bg-white rounded-[20px] border border-slate-200 p-2 shadow-sm">
 <button onclick="switchView('dashboard')" data-nav="dashboard" class="navBtn w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-teal text-white font-semibold text-sm"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> <span data-i18n="dashboard">Dashboard</span></button>
@@ -191,6 +174,29 @@
 </div>
 
 <main class="pb-20 lg:pb-0">
+<!-- VITALIS COMMUNITIES -->
+<section id="view-communities" class="view communityView space-y-5">
+<div class="communityHero rounded-[28px] p-6 sm:p-9 text-white relative overflow-hidden">
+<div class="absolute -right-12 -top-16 w-72 h-72 bg-white/10 rounded-full blur-2xl"></div><div class="absolute right-40 bottom-[-90px] w-64 h-64 bg-[#F59E0B]/20 rounded-full blur-2xl"></div>
+<div class="relative max-w-3xl"><span class="inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/20 px-3 py-1.5 text-xs font-bold"><i data-lucide="users" class="w-4 h-4"></i> YOUR WELLBEING, TOGETHER</span>
+<h2 class="mt-4 text-3xl sm:text-4xl font-extrabold font-display">Move together.<br><span class="text-teal-100">Feel the difference.</span></h2>
+<p class="mt-3 text-white/85 max-w-xl leading-relaxed">Find activity groups, share encouragement, meet people with similar goals, and discover local fitness events — at your own pace.</p>
+<div class="mt-5 flex flex-wrap gap-2"><button class="rounded-full bg-white text-teal-800 px-4 py-2.5 text-sm font-bold" onclick="showToast('Community data is not connected yet. Ask your administrator to enable the Communities database.')"><i data-lucide="compass" class="w-4 h-4 inline mr-1"></i> Explore communities</button><button class="rounded-full bg-white/15 border border-white/25 px-4 py-2.5 text-sm font-bold" onclick="setAppMode('vitalis')">← Back to Vitalis</button></div>
+</div></div>
+<div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+<div class="communityFeature"><span class="communityIcon bg-teal-50 text-teal"><i data-lucide="users-round" class="w-5 h-5"></i></span><p class="font-bold mt-3">Communities</p><p class="text-xs text-slate-500 mt-1 leading-relaxed">Join local walks, yoga circles, running clubs, and supportive fitness groups.</p></div>
+<div class="communityFeature"><span class="communityIcon bg-amber-50 text-amber-700"><i data-lucide="calendar-days" class="w-5 h-5"></i></span><p class="font-bold mt-3">Events</p><p class="text-xs text-slate-500 mt-1 leading-relaxed">Find upcoming activity meetups and see clear details before you RSVP.</p></div>
+<div class="communityFeature"><span class="communityIcon bg-violet-50 text-violet-700"><i data-lucide="user-round-search" class="w-5 h-5"></i></span><p class="font-bold mt-3">People to follow</p><p class="text-xs text-slate-500 mt-1 leading-relaxed">Find friends and fitness creators by their Vitalis username or profile link.</p></div>
+<div class="communityFeature"><span class="communityIcon bg-rose-50 text-rose-600"><i data-lucide="heart" class="w-5 h-5"></i></span><p class="font-bold mt-3">Encouragement</p><p class="text-xs text-slate-500 mt-1 leading-relaxed">Share workout reflections and celebrate consistency without pressure.</p></div>
+</div>
+<div class="grid lg:grid-cols-[1.3fr_.7fr] gap-4">
+<div class="communityPanel"><div class="flex items-center justify-between gap-3"><div><p class="text-xs font-bold tracking-[.14em] text-teal">COMMUNITY FEED</p><h3 class="text-xl font-extrabold font-display mt-1">Your circles, your pace</h3></div><span class="text-[11px] rounded-full bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 font-bold">Launching soon</span></div>
+<div class="communityEmpty mt-5"><div class="communityEmptyIcon"><i data-lucide="messages-square" class="w-6 h-6"></i></div><p class="font-bold mt-3">Your feed will grow with your community</p><p class="text-sm text-slate-500 mt-1 max-w-lg">When Communities is connected, posts from groups and people you follow will appear here. No sample accounts or activity are shown.</p></div>
+</div>
+<div class="space-y-4"><div class="communityPanel"><p class="text-xs font-bold tracking-[.14em] text-teal">UPCOMING EVENTS</p><div class="communityEmpty compact"><i data-lucide="calendar-clock" class="w-5 h-5 text-slate-400"></i><p class="font-semibold mt-2">No events to show yet</p><p class="text-xs text-slate-500 mt-1">Events will appear after community data is enabled.</p></div></div>
+<div class="communitySafety"><i data-lucide="shield-check" class="w-5 h-5 shrink-0"></i><div><p class="font-bold text-sm">A supportive space</p><p class="text-xs mt-1 leading-relaxed">Profiles stay private until a person chooses what to share. Scores are optional and never rank people.</p></div></div></div>
+</div>
+</section>
 <!-- DASHBOARD -->
 <section id="view-dashboard" class="view active space-y-4">
 <div id="dashHero" class="rounded-[24px] p-5 sm:p-6 text-white relative overflow-hidden bg-gradient-to-br from-[#0F766E] to-[#14B8A6]">
@@ -444,7 +450,7 @@
 <div><p class="text-xs font-semibold">Age style — font & motion changes instantly</p><div class="grid grid-cols-2 gap-2 mt-2">
 <button onclick="selectAgeStyle('kids')" class="p-3 rounded-xl border text-left hover:border-amber-300"><p class="font-bold text-sm">🌈 Kids — Storybook</p><p class="text-xs text-slate-500">Nunito • bouncy • confetti</p></button>
 <button onclick="selectAgeStyle('teens')" class="p-3 rounded-xl border text-left hover:border-violet-300"><p class="font-bold text-sm">⚡ Teens — Expressive</p><p class="text-xs text-slate-500">Outfit • bold • slide</p></button>
-<button onclick="selectAgeStyle('adults')" class="p-3 rounded-xl border-2 border-teal bg-teal-50 text-left"><p class="font-bold text-sm">✦ Adults — Calm</p><p class="text-xs text-slate-500">Jakarta • fade • precise</p></button>
+<button onclick="selectAgeStyle('adults')" class="p-3 rounded-xl border text-left hover:border-teal"><p class="font-bold text-sm">✦ Adults — Calm</p><p class="text-xs text-slate-500">Jakarta • fade • precise</p></button>
 <button onclick="selectAgeStyle('seniors')" class="p-3 rounded-xl border text-left hover:border-teal-300"><p class="font-bold text-sm">☀️ Seniors — Clear</p><p class="text-xs text-slate-500">Lexend • gentle • large</p></button>
 </div></div>
 <div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-semibold">Language (English default)</label><select onchange="setLang(this.value)" id="langSelect2" class="mt-1 w-full px-3 py-2.5 rounded-xl border bg-slate-50"><option value="en">English</option><option value="hi">हिन्दी</option></select></div><div><label class="text-xs font-semibold">Theme (fixed dark mode)</label><button onclick="toggleTheme()" class="mt-1 w-full py-2.5 rounded-xl border bg-slate-900 text-white font-semibold text-sm flex items-center justify-center gap-2"><i data-lucide="moon" class="w-4 h-4"></i> Toggle dark / light</button></div></div>
