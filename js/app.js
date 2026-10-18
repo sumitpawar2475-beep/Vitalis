@@ -6,8 +6,8 @@ const VITALIS_PUSH_PUBLIC_KEY = 'PASTE_PUBLIC_VAPID_KEY_HERE';
 const supabaseClient = window.supabase && !SUPABASE_URL.includes('YOUR_PROJECT_ID') && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
-const defaultState={ user:null, profile:null, ageStyle:'adults', units:'metric', lang:'en', theme:'light', hydration:{ consumed:0, goal:2300, glasses:[false,false,false,false,false,false,false,false], scheduleDone:{} }, reduceMotion:false, reminders:false, servings:2, prepStyle:'standard', workoutLogs:[], streakMap:{}, dailyRecords:{}, dailyPlanDate:null, workoutFeedback:{}, workoutTrackingStartDate:null, profilePic:null, profilePicTemp:null };
-function freshState(user=null){ return {...defaultState,user,hydration:{...defaultState.hydration,glasses:[...defaultState.hydration.glasses],scheduleDone:{}},workoutLogs:[],streakMap:{},dailyRecords:{},dailyPlanDate:null,workoutFeedback:{},workoutTrackingStartDate:null}; }
+const defaultState={ user:null, profile:null, ageStyle:'adults', units:'metric', lang:'en', theme:'light', hydration:{ consumed:0, goal:2300, glasses:[false,false,false,false,false,false,false,false], scheduleDone:{} }, reduceMotion:false, reminders:false, servings:2, prepStyle:'standard', workoutLogs:[], streakMap:{}, dailyRecords:{}, dailyPlanDate:null, workoutFeedback:{}, workoutAttendance:{}, workoutTrackingStartDate:null, profilePic:null, profilePicTemp:null };
+function freshState(user=null){ return {...defaultState,user,hydration:{...defaultState.hydration,glasses:[...defaultState.hydration.glasses],scheduleDone:{}},workoutLogs:[],streakMap:{},dailyRecords:{},dailyPlanDate:null,workoutFeedback:{},workoutAttendance:{},workoutTrackingStartDate:null}; }
 let state=freshState();
 let currentUserId=null, loadingAccountId=null, loadingAccountPromise=null, cloudSaveTimer=null, cloudSaveQueue=Promise.resolve();
 let passwordRecoveryActive=false;
@@ -103,7 +103,7 @@ async function loadAccount(session){
   const {data,error}=await supabaseClient.from('user_app_state').select('state').eq('user_id',user.id).maybeSingle();
   if(error) throw error; if(loadingAccountId!==user.id) return;
   const saved=data?.state||{};
-  state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null,workoutFeedback:saved.workoutFeedback||{},workoutTrackingStartDate:saved.workoutTrackingStartDate||null};
+  state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null,workoutFeedback:saved.workoutFeedback||{},workoutAttendance:saved.workoutAttendance||{},workoutTrackingStartDate:saved.workoutTrackingStartDate||null};
   currentUserId=user.id; loadingAccountId=null; loadingAccountPromise=null;
   syncDailyPlan();
   applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
@@ -117,14 +117,14 @@ async function signOut(){ if(!supabaseClient){showAuthStatus('Connect this websi
 function todayStr(offset=0){ const d=new Date(); d.setDate(d.getDate()+offset); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); }
 function shiftDateKey(dateKey,offset){ const [y,m,d]=dateKey.split('-').map(Number); const value=new Date(y,m-1,d+offset,12); return [value.getFullYear(),String(value.getMonth()+1).padStart(2,'0'),String(value.getDate()).padStart(2,'0')].join('-'); }
 function syncDailyPlan(){
- const today=todayStr(); state.dailyRecords=state.dailyRecords||{}; state.streakMap=state.streakMap||{}; state.workoutFeedback=state.workoutFeedback||{};
+ const today=todayStr(); state.dailyRecords=state.dailyRecords||{}; state.streakMap=state.streakMap||{}; state.workoutFeedback=state.workoutFeedback||{}; state.workoutAttendance=state.workoutAttendance||{};
  const previous=state.dailyPlanDate; let changed=false;
  if(!state.workoutTrackingStartDate){state.workoutTrackingStartDate=today;changed=true;}
  if(previous&&previous<today){
   for(let day=previous;day<today;day=shiftDateKey(day,1)){
    if(!state.dailyRecords[day]){
     const logs=(state.workoutLogs||[]).filter(log=>log.date===day);
-    state.dailyRecords[day]={waterMl:day===previous?Number(state.hydration.consumed)||0:0,waterGoal:Number(state.hydration.goal)||2300,workoutCount:logs.length};
+    state.dailyRecords[day]={waterMl:day===previous?Number(state.hydration.consumed)||0:0,waterGoal:Number(state.hydration.goal)||2300,workoutCount:Math.max(logs.length,getCompletedWorkoutAttendanceCount(day))};
    }
    const record=state.dailyRecords[day];
    state.streakMap[day]=Number(record.waterMl)>=Number(state.hydration.goal)||Number(record.workoutCount)>0;
@@ -139,7 +139,7 @@ function getStreakDayData(dateKey){
  const logs=(state.workoutLogs||[]).filter(log=>log.date===dateKey);
  const waterMl=dateKey===todayStr()?Number(state.hydration.consumed)||0:Number(record.waterMl)||0;
  const waterGoal=Number(dateKey===todayStr()?state.hydration.goal:record.waterGoal)||Number(state.hydration.goal)||2300;
- const workoutCount=dateKey===todayStr()?logs.length:Number(record.workoutCount??logs.length)||0;
+ const workoutCount=dateKey===todayStr()?Math.max(logs.length,getCompletedWorkoutAttendanceCount(dateKey)):Math.max(Number(record.workoutCount??logs.length)||0,getCompletedWorkoutAttendanceCount(dateKey));
  const legacyOnly=!state.dailyRecords?.[dateKey]&&dateKey<todayStr()&&state.streakMap?.[dateKey]===true;
  const waterDone=waterMl>=waterGoal||legacyOnly, workoutDone=workoutCount>0;
  const completed=legacyOnly?1:Number(waterDone)+Number(workoutDone);
@@ -548,8 +548,23 @@ function printRecipe(){ window.print(); }
 function addToShoppingFromRecipe(){ generateShoppingList(); closeRecipe(); }
 
 /* WORKOUT */
-function getWorkoutAdaptation(){
- const today=todayStr(),start=state.workoutTrackingStartDate||today,logs=state.workoutLogs||[];
+function getCompletedWorkoutAttendanceCount(dateKey){
+ return Object.values(state.workoutAttendance?.[dateKey]||{}).filter(Boolean).length;
+}
+function hasWorkoutOnDate(dateKey){
+ return (state.workoutLogs||[]).some(log=>log.date===dateKey)||getCompletedWorkoutAttendanceCount(dateKey)>0;
+}
+function isWorkoutExerciseComplete(dateKey,name){
+ const checks=state.workoutAttendance?.[dateKey]||{};
+ if(Object.prototype.hasOwnProperty.call(checks,name)) return Boolean(checks[name]);
+ return (state.workoutLogs||[]).some(log=>log.date===dateKey&&log.name===name);
+}
+function weekDateKeys(dateKey=todayStr()){
+ const mondayOffset=(new Date(dateKey+'T12:00:00').getDay()+6)%7;
+ return Array.from({length:7},(_,i)=>shiftDateKey(dateKey,i-mondayOffset));
+}
+function getWorkoutAdaptation(asOfDate=todayStr()){
+ const today=asOfDate,start=state.workoutTrackingStartDate||today;
  let missedDays=0;
  const profile=state.profile||demoProfiles.adults;
  const group=profile.age<=12?'kids':profile.age<=17?'teens':profile.age>=60?'seniors':'adults';
@@ -557,7 +572,7 @@ function getWorkoutAdaptation(){
   const date=shiftDateKey(today,-offset);
   if(date<start) break;
   if(weeklyWorkoutFocus(group,date)==='Recovery') continue;
-  if(logs.some(log=>log.date===date)) break;
+  if(hasWorkoutOnDate(date)) break;
   missedDays++;
  }
  const feedbackDates=Object.keys(state.workoutFeedback||{}).filter(date=>date<today&&date>=shiftDateKey(today,-3)).sort();
@@ -567,6 +582,49 @@ function getWorkoutAdaptation(){
  else if(missedDays>0) mode='restart';
  else if(lastFeedback==='easy'&&profile.age>=20&&profile.age<60) mode='progress';
  return {missedDays,lastFeedback,mode};
+}
+function toggleWeeklyWorkoutAttendance(dateKey,index){
+ if(dateKey>todayStr()) return;
+ const profile=state.profile||demoProfiles.adults;
+ const plan=getWorkoutPlan(profile,dateKey);
+ const exercise=plan.exercises[index];
+ if(!exercise) return;
+ state.workoutAttendance=state.workoutAttendance||{};
+ state.workoutAttendance[dateKey]=state.workoutAttendance[dateKey]||{};
+ const checks=state.workoutAttendance[dateKey];
+ const complete=isWorkoutExerciseComplete(dateKey,exercise.name);
+ checks[exercise.name]=!complete;
+ const logs=(state.workoutLogs||[]).filter(log=>log.date===dateKey);
+ const workoutCount=Math.max(logs.length,getCompletedWorkoutAttendanceCount(dateKey));
+ if(dateKey<todayStr()){
+  state.dailyRecords=state.dailyRecords||{};
+  const record=state.dailyRecords[dateKey]||{};
+  state.dailyRecords[dateKey]={...record,workoutCount};
+  const waterDone=Number(record.waterMl)>=Number(record.waterGoal||state.hydration.goal);
+  state.streakMap[dateKey]=Boolean(waterDone||workoutCount>0);
+ }else if(workoutCount>0){
+  state.streakMap[dateKey]=true;
+ }
+ save();
+ renderWeeklyWorkoutPlan(profile);
+ renderStreakCalendar();
+ showToast(checks[exercise.name]?'Exercise marked attended.':'Exercise unmarked.');
+}
+function renderWeeklyWorkoutPlan(profile=state.profile||demoProfiles.adults){
+ const grid=document.getElementById('weeklyWorkoutGrid');
+ if(!grid) return;
+ const today=todayStr(),dates=weekDateKeys(today);
+ grid.innerHTML=dates.map(dateKey=>{
+  const plan=getWorkoutPlan(profile,dateKey);
+  const doneCount=plan.exercises.filter(ex=>isWorkoutExerciseComplete(dateKey,ex.name)).length;
+  const future=dateKey>today,isToday=dateKey===today;
+  const dateLabel=new Date(dateKey+'T12:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  const items=plan.exercises.map((ex,index)=>{
+   const checked=isWorkoutExerciseComplete(dateKey,ex.name);
+   return '<label class="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs '+(checked?'text-teal-dark':'text-slate-600')+'"><input type="checkbox" class="mt-0.5 accent-teal" '+(checked?'checked ':'')+(future?'disabled ':'')+'aria-label="Mark '+ex.name+' attended" onchange="toggleWeeklyWorkoutAttendance(\''+dateKey+'\','+index+')"><span class="flex-1"><b>'+ex.name+'</b><span class="block text-[11px] text-slate-500">'+ex.sets+' • '+ex.reps+' • '+ex.mins+' min</span></span></label>';
+  }).join('');
+  return '<details class="rounded-xl border border-slate-200 bg-white overflow-hidden" '+(isToday?'open':'')+'><summary class="cursor-pointer list-none flex flex-wrap items-center gap-2 p-3 hover:bg-slate-50"><span class="font-bold text-sm">'+dateLabel+(isToday?' • Today':'')+'</span><span class="text-xs text-teal font-semibold">'+plan.focus+'</span><span class="ml-auto text-[11px] text-slate-500">'+doneCount+'/'+plan.exercises.length+' attended</span></summary><div class="px-3 pb-3 grid sm:grid-cols-2 gap-2">'+items+'</div></details>';
+ }).join('');
 }
 function weeklyWorkoutFocus(group,dateKey=todayStr()){
  const day=new Date(dateKey+'T12:00:00').getDay();
@@ -618,7 +676,7 @@ function saveWorkoutFeedback(value){
  state.workoutFeedback=state.workoutFeedback||{}; state.workoutFeedback[todayStr()]=value; save(); renderWorkout();
  showToast('Thanks — your next plan will adapt to that feedback.');
 }
-function getWorkoutPlan(p){
+function getWorkoutPlan(p,dateKey=todayStr()){
 const age=p.age;
 let group='adults'; if(age<=12) group='kids'; else if(age<=17) group='teens'; else if(age>=60) group='seniors';
 let ex=[];
@@ -650,7 +708,7 @@ else ex=[
 
 if(p.goal==='muscle'&&group!=='kids'&&group!=='seniors'){ ex.forEach(e=>{ if(/push|squat|lunge/i.test(e.name)) e.sets='4 sets'; }); }
 
-const focus=weeklyWorkoutFocus(group);
+const focus=weeklyWorkoutFocus(group,dateKey);
 if(!['kids'].includes(group)&&focus!=='Strength A'&&focus!=='Strength B'&&focus!=='Strength + balance'&&focus!=='Sport or active play') ex=movementSession(focus,group);
 else if(group==='teens'&&focus==='Sport or active play') ex=movementSession(focus,group);
 if(group==='teens'&&(focus==='Strength A'||focus==='Strength B')) ex=[
@@ -662,7 +720,7 @@ if(group==='teens'&&(focus==='Strength A'||focus==='Strength B')) ex=[
  {name:'Cool-down stretch',icon:'🌿',sets:'1 round',reps:'4 min',mins:4,met:2,desc:'Gentle stretches only; no bouncing or forcing.'}
  ];
 if(p.activity==='sedentary') ex=ex.map(e=>({...e,mins:Math.max(2,Math.round(e.mins*.8)),sets:e.sets.replace(/(\\d+) sets?/,(_,n)=>Math.max(1,Math.floor(Number(n)*.8))+' sets')}));
-const adaptation=getWorkoutAdaptation();
+const adaptation=dateKey>todayStr()?{missedDays:0,lastFeedback:null,mode:'steady'}:getWorkoutAdaptation(dateKey);
 if(adaptation.mode==='gentle') ex=movementSession('Recovery',group);
 else if(adaptation.mode==='restart') ex=ex.map(e=>({...e,mins:Math.max(2,Math.round(e.mins*.75)),sets:e.sets.replace(/(\d+) sets?/,(_,n)=>Math.max(1,Math.floor(Number(n)*.75))+' sets')}));
 else if(adaptation.mode==='progress'&&group==='adults') ex=ex.map((e,i)=>({...e,mins:i===0?e.mins+2:e.mins}));
@@ -673,6 +731,7 @@ return {group,focus,adaptation,exercises:ex,totalCal,totalMin,level:group==='kid
 function renderWorkoutPreviewChip(){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); const el=document.getElementById('dashWorkoutPreview'); if(el) el.textContent=`${plan.level.split('•')[0]} • ~${plan.totalMin} min • ~${plan.totalCal} kcal`; }
 function renderWorkout(){
 const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p);
+renderWeeklyWorkoutPlan(p);
 const coach=document.getElementById('workoutCoachCard');
 if(coach){
  const miss=plan.adaptation.missedDays;
