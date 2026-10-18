@@ -6,12 +6,12 @@ const VITALIS_PUSH_PUBLIC_KEY = 'PASTE_PUBLIC_VAPID_KEY_HERE';
 const supabaseClient = window.supabase && !SUPABASE_URL.includes('YOUR_PROJECT_ID') && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
-const defaultState={ user:null, profile:null, ageStyle:'adults', units:'metric', lang:'en', theme:'light', hydration:{ consumed:0, goal:2300, glasses:[false,false,false,false,false,false,false,false], scheduleDone:{} }, reduceMotion:false, reminders:false, servings:2, prepStyle:'standard', workoutLogs:[], streakMap:{}, dailyRecords:{}, dailyPlanDate:null, workoutFeedback:{}, workoutAttendance:{}, workoutTrackingStartDate:null, profilePic:null, profilePicTemp:null };
-function freshState(user=null){ return {...defaultState,user,hydration:{...defaultState.hydration,glasses:[...defaultState.hydration.glasses],scheduleDone:{}},workoutLogs:[],streakMap:{},dailyRecords:{},dailyPlanDate:null,workoutFeedback:{},workoutAttendance:{},workoutTrackingStartDate:null}; }
+const defaultState={ user:null, profile:null, ageStyle:'adults', units:'metric', lang:'en', theme:'light', hydration:{ consumed:0, goal:2300, glasses:[false,false,false,false,false,false,false,false], scheduleDone:{} }, reduceMotion:false, reminders:false, servings:2, prepStyle:'standard', mealPlanVersion:0, mealPlanOverrides:{}, workoutLogs:[], streakMap:{}, dailyRecords:{}, dailyPlanDate:null, workoutFeedback:{}, workoutAttendance:{}, workoutTrackingStartDate:null, profilePic:null, profilePicTemp:null };
+function freshState(user=null){ return {...defaultState,user,hydration:{...defaultState.hydration,glasses:[...defaultState.hydration.glasses],scheduleDone:{}},workoutLogs:[],streakMap:{},dailyRecords:{},dailyPlanDate:null,workoutFeedback:{},workoutAttendance:{},mealPlanOverrides:{},workoutTrackingStartDate:null}; }
 let state=freshState();
 let currentUserId=null, loadingAccountId=null, loadingAccountPromise=null, cloudSaveTimer=null, cloudSaveQueue=Promise.resolve();
 let passwordRecoveryActive=false;
-let authMode='signin', currentStep=1, currentMealDay=0, mealData=[], chartInstance=null, burnChartInstance=null, timerInterval=null, timerSeconds=1200, timerRunning=false, currentRecipe=null, currentAudio=null, currentTrackIdx=-1, musicProgressInt=null;
+let authMode='signin', currentStep=1, currentMealDay=(new Date().getDay()+6)%7, mealData=[], mealPlanBuiltForWeek=null, mealPlanLastSeenDate=todayStr(), activeMealSwapType=null, mealSwapCandidates=[], chartInstance=null, burnChartInstance=null, timerInterval=null, timerSeconds=1200, timerRunning=false, currentRecipe=null, currentAudio=null, currentTrackIdx=-1, musicProgressInt=null;
 
 let demoProfiles={
 kids:{name:'Aanya', age:9, sex:'female', height:132, weight:29, activity:'light', climate:'moderate', diet:'vegetarian', allergies:[], budget:'low', cuisine:'indian', sleep:9.5, goal:'balanced', health:'', meds:''},
@@ -103,7 +103,7 @@ async function loadAccount(session){
   const {data,error}=await supabaseClient.from('user_app_state').select('state').eq('user_id',user.id).maybeSingle();
   if(error) throw error; if(loadingAccountId!==user.id) return;
   const saved=data?.state||{};
-  state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null,workoutFeedback:saved.workoutFeedback||{},workoutAttendance:saved.workoutAttendance||{},workoutTrackingStartDate:saved.workoutTrackingStartDate||null};
+  state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null,workoutFeedback:saved.workoutFeedback||{},workoutAttendance:saved.workoutAttendance||{},mealPlanVersion:Number(saved.mealPlanVersion)||0,mealPlanOverrides:saved.mealPlanOverrides||{},workoutTrackingStartDate:saved.workoutTrackingStartDate||null};
   currentUserId=user.id; loadingAccountId=null; loadingAccountPromise=null;
   syncDailyPlan();
   applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
@@ -305,18 +305,91 @@ for(let a of allergies){ if(mealDiets && mealTagsContainAllergy(mealDiets,a)){} 
 return true;
 }
 function mealTagsContainAllergy(){ return false; }
-function mealOk(meal, p){
-let dietOk=false;
-if(p.diet==='vegan') dietOk=meal.diet.includes('vegan');
-else if(p.diet==='vegetarian') dietOk=meal.diet.includes('vegetarian')||meal.diet.includes('vegan');
-else if(p.diet==='pescatarian') dietOk=meal.diet.includes('pescatarian')||meal.diet.includes('vegetarian')||meal.diet.includes('vegan');
-else if(p.diet==='nonveg') dietOk=meal.diet.includes('nonveg')||meal.diet.includes('omnivore')||meal.diet.includes('vegetarian')||meal.diet.includes('vegan');
-else if(p.diet==='omnivore') dietOk=true;
-else dietOk=meal.diet.includes('vegetarian')||meal.diet.includes('vegan')||meal.diet.includes('omnivore')||meal.diet.includes('nonveg');
-if(!dietOk) return false;
-for(let al of (p.allergies||[])){ if(meal.tags.includes(al)) return false; }
-return true;
+const mealIngredientAliases={
+ peanut:['peanut','peanuts'],dairy:['dairy','milk','curd','yogurt','yoghurt','cheese','paneer','ghee','butter'],
+ gluten:['gluten','wheat','atta','bread','roti','semolina','suji','rava'],soy:['soy','soya','tofu'],
+ egg:['egg','eggs'],fish:['fish'],shellfish:['shellfish','prawn','shrimp','crab'],
+ chicken:['chicken'],potato:['potato','potatoes'],rice:['rice'],garlic:['garlic'],onion:['onion']
+};
+function normalizeFoodTerm(value){ return String(value||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/s\b/,''); }
+function mealSearchText(meal){ return [meal.name,...(meal.ingredients||[]).map(item=>item.item),...(meal.tags||[])].join(' ').toLowerCase(); }
+function mealContainsTerm(meal,term){
+ const normalized=normalizeFoodTerm(term);
+ if(!normalized) return false;
+ const text=mealSearchText(meal);
+ const aliasGroup=Object.values(mealIngredientAliases).find(list=>list.some(item=>normalizeFoodTerm(item)===normalized));
+ const terms=aliasGroup||[normalized];
+ return terms.some(item=>new RegExp('(^|[^a-z0-9])'+item.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^a-z0-9]|$)','i').test(text));
 }
+function mealFitsBudget(meal,p){
+ const order={low:0,medium:1,high:2};
+ const chosen=order[p?.budget]??1,required=order[meal?.budget]??1;
+ return required<=chosen;
+}
+function mealOk(meal, p){
+ if(!meal||!Array.isArray(meal.diet)||!Array.isArray(meal.tags)) return false;
+ let dietOk=false;
+ if(p.diet==='vegan') dietOk=meal.diet.includes('vegan');
+ else if(p.diet==='vegetarian') dietOk=meal.diet.includes('vegetarian')||meal.diet.includes('vegan');
+ else if(p.diet==='pescatarian') dietOk=meal.diet.includes('pescatarian')||meal.diet.includes('vegetarian')||meal.diet.includes('vegan');
+ else if(p.diet==='nonveg') dietOk=meal.diet.includes('nonveg')||meal.diet.includes('omnivore')||meal.diet.includes('vegetarian')||meal.diet.includes('vegan');
+ else if(p.diet==='omnivore') dietOk=true;
+ else if(p.diet==='jain') dietOk=(meal.diet.includes('vegetarian')||meal.diet.includes('vegan'))&&!/onion|garlic|potato|radish|carrot|beet/i.test(mealSearchText(meal));
+ else dietOk=meal.diet.includes('vegetarian')||meal.diet.includes('vegan');
+ if(!dietOk||!mealFitsBudget(meal,p)) return false;
+ return !(p.allergies||[]).some(allergy=>meal.tags.includes(allergy)||mealContainsTerm(meal,allergy));
+}
+function mealProteinHint(meal){
+ return /dal|lentil|rajma|beans|chana|sprout|tofu|egg|chicken|fish|paneer|curd|yogurt|peanut|peanuts|keema/i.test(mealSearchText(meal));
+}
+function mealCarbHint(meal){
+ return /poha|oats|rice|roti|paratha|millet|bread|potato|wheat|fruit|banana/i.test(mealSearchText(meal));
+}
+function mealPlanScore(meal,type,p,workout){
+ const strength=/strength/i.test(workout.focus),active=/cardio|sport|play|movement/i.test(workout.focus);
+ let score=0;
+ if(strength&&mealProteinHint(meal)) score+=4;
+ if(active&&mealCarbHint(meal)) score+=3;
+ if(p.goal==='muscle'&&p.age>=18&&mealProteinHint(meal)) score+=2;
+ if(p.age<18&&['breakfast','snack'].includes(type)&&mealProteinHint(meal)) score+=1;
+ if(p.age>=65&&mealProteinHint(meal)) score+=1;
+ return score;
+}
+function mealHash(value){ let hash=2166136261; for(const char of String(value)){hash^=char.charCodeAt(0);hash=Math.imul(hash,16777619);} return hash>>>0; }
+function chooseMealForDay(type,p,workout,dateKey,used){
+ const eligible=(mealPool[type]||[]).filter(meal=>mealOk(meal,p));
+ if(!eligible.length) return null;
+ const ranked=eligible.map(meal=>({meal,score:mealPlanScore(meal,type,p,workout)-(used.has(meal.name)?3:0)})).sort((a,b)=>b.score-a.score);
+ const top=ranked.filter(row=>row.score>=ranked[0].score-1);
+ const seed=[p.id||p.name,p.age,p.sex,p.activity,p.diet,dateKey,type,state.mealPlanVersion||0].join('|');
+ const overrideName=state.mealPlanOverrides?.[dateKey]?.[type];
+ const override=overrideName&&eligible.find(meal=>meal.name===overrideName);
+ return override||top[mealHash(seed)%top.length].meal;
+}
+function getAdultEnergyReference(p){
+ const age=Number(p.age),height=Number(p.height),weight=Number(p.weight),sex=String(p.sex||'').toLowerCase();
+ if(age<19||!Number.isFinite(height)||!Number.isFinite(weight)||!['female','male'].includes(sex)) return null;
+ const activity=String(p.activity||'light').toLowerCase();
+ const level=activity==='sedentary'?'inactive':activity==='light'?'low':activity==='active'?'very':'active';
+ const factors=sex==='male'?{inactive:[753.07,-10.83,6.50,14.10],low:[581.47,-10.83,8.30,14.94],active:[1004.82,-10.83,6.52,15.91],very:[-517.88,-10.83,15.61,19.11]}:{inactive:[584.90,-7.01,5.72,11.71],low:[575.77,-7.01,6.60,12.14],active:[710.25,-7.01,6.54,12.34],very:[511.83,-7.01,9.07,12.56]};
+ const [base,ageFactor,heightFactor,weightFactor]=factors[level];
+ const estimate=base+ageFactor*age+heightFactor*height+weightFactor*weight;
+ return Number.isFinite(estimate)&&estimate>0?Math.round(estimate/50)*50:null;
+}
+function renderMealPlanContext(profile,dateKey){
+ const target=document.getElementById('mealPersonalizationText');
+ if(!target) return;
+ const plan=getWorkoutPlan(profile,dateKey),focus=plan.focus.toLowerCase();
+ const dateLabel=new Date(dateKey+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
+ const profileText='Meals for '+dateLabel+' use your age, profile sex, activity, goal, food preference, allergies and '+plan.totalMin+'-minute '+focus+' workout as planning context.';
+ if(profile.age<19){
+  target.textContent=profileText+' This is a growth-first menu: no adult calorie estimate or weight-loss restriction is applied. Check labels and ingredient handling for allergy safety.';
+  return;
+ }
+ const energy=getAdultEnergyReference(profile);
+ target.textContent=profileText+(energy?' A broad adult maintenance-energy reference is about '+energy.toLocaleString()+' kcal/day; it is not a meal cap or medical prescription.':' No calorie target is shown because the profile is missing inputs for an adult estimate.')+' This general estimate is not for pregnancy, breastfeeding or medical diets. Check labels and ingredient handling for allergy safety.';
+}
+
 
 /* RENDER ALL */
 function renderAll(){ if(state.profile){ const h=document.getElementById('bmiToolH'), w=document.getElementById('bmiToolW'); if(h&&w){ h.value=Math.min(+h.max,Math.max(+h.min,Math.round(state.profile.height))); w.value=Math.min(+w.max,Math.max(+w.min,Math.round(state.profile.weight))); } } updateBmiTool(true); renderDashboard(); renderHydration(); renderMeals(); renderWorkout(); renderMusic(); renderSettings(); renderHeaderAvatar(); lucide.createIcons(); }
@@ -512,25 +585,93 @@ async function toggleReminders(enabled){
 function celebrate(){ if(state.reduceMotion) return; if(state.ageStyle==='kids'){ for(let i=0;i<24;i++){ const c=document.createElement('div'); c.className='confetti'; c.style.left=Math.random()*100+'vw'; c.style.background=['#FF6B5A','#FFD93D','#6BCB77','#4D96FF','#B983FF'][i%5]; c.style.borderRadius=Math.random()>0.5?'50%':'4px'; document.body.appendChild(c); setTimeout(()=>c.remove(),1500); } } }
 
 /* MEALS */
-function generateMeals(){ const p=state.profile||demoProfiles.adults; mealData=[]; for(let d=0;d<7;d++){ const pick=(arr)=>{ const ok=arr.filter(m=>mealOk(m,p)); const pool=ok.length?ok:arr; return pool[Math.floor(Math.random()*pool.length)]; }; mealData.push({breakfast:pick(mealPool.breakfast),lunch:pick(mealPool.lunch),dinner:pick(mealPool.dinner),snack:pick(mealPool.snack)}); } renderMeals(); }
-function shuffleMeals(){ generateMeals(); showToast('Week shuffled 🔀'); }
+function generateMeals(){
+ const p=state.profile||demoProfiles.adults,dates=weekDateKeys(todayStr()),usedByType={breakfast:new Set(),lunch:new Set(),dinner:new Set(),snack:new Set()};
+ mealData=dates.map(dateKey=>{
+  const workout=getWorkoutPlan(p,dateKey),day={};
+  for(const type of Object.keys(usedByType)){
+   const meal=chooseMealForDay(type,p,workout,dateKey,usedByType[type]);
+   day[type]=meal;
+   if(meal) usedByType[type].add(meal.name);
+  }
+  return day;
+ });
+ currentMealDay=(new Date().getDay()+6)%7;
+ mealPlanBuiltForWeek=dates[0]; mealPlanLastSeenDate=todayStr();
+ renderMeals();
+}
+function shuffleMeals(){ state.mealPlanVersion=(Number(state.mealPlanVersion)||0)+1; state.mealPlanOverrides={}; save(); generateMeals(); showToast('Your week’s meals have been reshuffled.'); }
 function renderMeals(){
 const p=state.profile||demoProfiles.adults;
+const dates=weekDateKeys(todayStr()),today=todayStr(),todayIndex=(new Date().getDay()+6)%7;
+if(mealData.length!==7||mealPlanBuiltForWeek!==dates[0]){ generateMeals(); return; }
+if(mealPlanLastSeenDate!==today){currentMealDay=todayIndex;mealPlanLastSeenDate=today;}
 const dietLabel={omnivore:'Omnivore • Everything',nonveg:'Non-vegetarian • Veg + Chicken/Egg/Fish',vegetarian:'Vegetarian • Balanced',vegan:'Vegan • Plant-based',pescatarian:'Pescatarian • Fish + Veg',jain:'Jain adaptable • Veg'}[p.diet]||p.diet;
 document.getElementById('mealDietChip').textContent=dietLabel;
-document.getElementById('mealBudgetLabel').textContent=p.budget[0].toUpperCase()+p.budget.slice(1);
+document.getElementById('mealBudgetLabel').textContent=(p.budget||'medium')[0].toUpperCase()+(p.budget||'medium').slice(1);
+renderMealPlanContext(p,dates[currentMealDay]);
 const tabs=document.getElementById('dayTabs'); tabs.innerHTML='';
-['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>{ const b=document.createElement('button'); b.onclick=()=>{ currentMealDay=i; renderMeals(); }; b.className=`shrink-0 px-4 py-2 rounded-full text-sm font-bold border ${i===currentMealDay?'bg-teal text-white border-teal':'bg-white border-slate-200'}`; b.textContent=(i===new Date().getDay()-1||(new Date().getDay()===0&&i===6)?'● ':'')+d; tabs.appendChild(b); });
-const day=mealData[currentMealDay]||mealData[0]; const grid=document.getElementById('mealGrid'); grid.innerHTML='';
+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>{ const b=document.createElement('button'); b.onclick=()=>{ currentMealDay=i; renderMeals(); }; b.className=`shrink-0 px-4 py-2 rounded-full text-sm font-bold border ${i===currentMealDay?'bg-teal text-white border-teal':'bg-white border-slate-200'}`; const dayDate=new Date(dates[i]+'T12:00:00').getDate(); b.textContent=(i===todayIndex?'Today • ':'')+d+' '+dayDate; tabs.appendChild(b); });
+const day=mealData[currentMealDay]||{},grid=document.getElementById('mealGrid'); grid.innerHTML='';
 [['breakfast','Breakfast','🌅'],['lunch','Lunch','☀️'],['dinner','Dinner','🌙'],['snack','Snack','🍎']].forEach(([k,label,emoji])=>{
-const m=day[k]; const card=document.createElement('div'); card.className='meal-card bg-white border p-4 cursor-pointer card-hover'; card.onclick=()=>openRecipe(m,k);
-const isNonveg=m.tags.includes('nonveg')||m.diet.includes('nonveg')||/chicken|egg|fish/i.test(m.name);
-card.innerHTML=`<div class="flex items-start gap-3"><div class="w-11 h-11 rounded-2xl bg-slate-50 flex items-center justify-center text-2xl shrink-0">${m.icon}</div><div class="flex-1 min-w-0"><p class="text-[10px] font-bold tracking-widest text-slate-400">${emoji} ${label.toUpperCase()} • ${m.time} MIN • ${m.diff.toUpperCase()}</p><p class="font-bold text-sm leading-snug mt-0.5">${m.name}</p><div class="flex flex-wrap gap-1 mt-2">${isNonveg?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 font-bold">🍗 Non-veg</span>':''}${m.tags.includes('peanut')?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 border">🥜</span>':''}${m.tags.includes('dairy')?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border">🥛</span>':''}${m.tags.includes('gluten')?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border">🌾</span>':''}<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 border font-bold">${m.cal} kcal</span></div></div></div><div class="mt-3 flex items-center justify-between"><span class="text-xs font-bold text-teal">View recipe →</span><span class="text-[11px] text-slate-400">Serves 2 • Scales</span></div>`;
-grid.appendChild(card);
+ const m=day[k],card=document.createElement('div');
+ if(!m){card.className='meal-card bg-white border p-4 text-sm text-slate-500';card.textContent='No menu option currently matches this meal slot, budget and saved food restrictions. Review the profile filters to see options.';grid.appendChild(card);return;}
+ card.className='meal-card bg-white border p-4 cursor-pointer card-hover'; card.onclick=()=>openRecipe(m,k);
+ const isNonveg=m.tags.includes('nonveg')||m.diet.includes('nonveg')||/chicken|egg|fish/i.test(m.name);
+ card.innerHTML=`<div class="flex items-start gap-3"><div class="w-11 h-11 rounded-2xl bg-slate-50 flex items-center justify-center text-2xl shrink-0">${m.icon}</div><div class="flex-1 min-w-0"><p class="text-[10px] font-bold tracking-widest text-slate-400">${emoji} ${label.toUpperCase()} • ${m.time} MIN • ${m.diff.toUpperCase()}</p><p class="font-bold text-sm leading-snug mt-0.5">${m.name}</p><div class="flex flex-wrap gap-1 mt-2">${isNonveg?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 font-bold">🍗 Non-veg</span>':''}${m.tags.includes('peanut')?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 border">🥜</span>':''}${m.tags.includes('dairy')?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border">🥛</span>':''}${m.tags.includes('gluten')?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border">🌾</span>':''}<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 border font-bold">${m.cal} kcal</span></div></div></div><div class="mt-3 flex items-center justify-between"><span class="text-xs font-bold text-teal">View recipe →</span><button type="button" class="mealSwapBtn text-xs font-bold px-3 py-1.5 rounded-full bg-teal-50 text-teal border border-teal/20">↻ Swap dish</button><span class="text-[11px] text-slate-400">Serves 2 • Scales</span></div>`;
+ card.querySelector('.mealSwapBtn').addEventListener('click',event=>{event.stopPropagation();openMealSwap(k);});
+ grid.appendChild(card);
 });
 lucide.createIcons();
 }
-function generateShoppingList(){ const day=mealData[currentMealDay]; let items=[]; Object.values(day).forEach(m=>m.ingredients.forEach(ing=>items.push(`${ing.item} — ${ing.qty*state.servings/2}${ing.unit}`))); document.getElementById('shoppingList').classList.remove('hidden'); document.getElementById('shoppingItems').innerHTML=items.map(i=>`<li>${i}</li>`).join(''); showToast('Shopping list ready 🧺'); document.getElementById('shoppingList').scrollIntoView({behavior:'smooth'}); }
+
+function openMealSwap(type){
+ const meal=mealData[currentMealDay]?.[type];
+ if(!meal){showToast('There is no current dish to swap.');return;}
+ activeMealSwapType=type; mealSwapCandidates=[];
+ document.getElementById('mealSwapCurrent').textContent='Current '+type+': '+meal.name;
+ document.getElementById('missingIngredientsInput').value='';
+ document.getElementById('mealSwapResults').innerHTML='';
+ document.getElementById('mealSwapPanel').classList.remove('hidden');
+ document.getElementById('mealSwapPanel').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function closeMealSwap(){
+ const panel=document.getElementById('mealSwapPanel'); if(panel) panel.classList.add('hidden');
+ activeMealSwapType=null; mealSwapCandidates=[];
+}
+function findMealSwaps(){
+ if(!activeMealSwapType) return;
+ const p=state.profile||demoProfiles.adults,dateKey=weekDateKeys(todayStr())[currentMealDay];
+ const current=mealData[currentMealDay]?.[activeMealSwapType],plan=getWorkoutPlan(p,dateKey);
+ const missing=(document.getElementById('missingIngredientsInput').value||'').split(/[,;\n]+/).map(value=>value.trim()).filter(Boolean);
+ const options=(mealPool[activeMealSwapType]||[]).filter(meal=>mealOk(meal,p)&&meal.name!==current?.name&&!missing.some(term=>mealContainsTerm(meal,term)))
+  .map(meal=>({meal,score:mealPlanScore(meal,activeMealSwapType,p,plan)})).sort((a,b)=>b.score-a.score);
+ mealSwapCandidates=options.slice(0,5).map(row=>row.meal);
+ const results=document.getElementById('mealSwapResults'); results.innerHTML='';
+ if(!mealSwapCandidates.length){
+  const note=document.createElement('p');note.className='text-sm text-slate-600 bg-amber-50 border border-amber-200 rounded-xl p-3';note.textContent='No other dish in this meal slot matches the saved diet, allergy and budget filters plus the unavailable ingredients. Try fewer missing ingredients or review the profile restrictions.';results.appendChild(note);return;
+ }
+ mealSwapCandidates.forEach((meal,index)=>{
+  const button=document.createElement('button');button.type='button';button.className='w-full text-left bg-white border border-slate-200 rounded-xl p-3 hover:border-teal flex items-center gap-3';
+  const icon=document.createElement('span');icon.className='text-xl';icon.textContent=meal.icon;
+  const details=document.createElement('span');details.className='flex-1';
+  const title=document.createElement('b');title.className='block text-sm';title.textContent=meal.name;
+  const meta=document.createElement('span');meta.className='block text-xs text-slate-500 mt-1';meta.textContent=meal.cal+' kcal • '+meal.time+' min • '+meal.diff+' • fits today’s plan';
+  details.append(title,meta);const choose=document.createElement('span');choose.className='text-xs font-bold text-teal';choose.textContent='Use dish';
+  button.append(icon,details,choose);button.addEventListener('click',()=>applyMealSwap(index));results.appendChild(button);
+ });
+}
+function applyMealSwap(index){
+ const meal=mealSwapCandidates[index],type=activeMealSwapType;
+ if(!meal||!type||!mealOk(meal,state.profile||demoProfiles.adults)) return;
+ const dateKey=weekDateKeys(todayStr())[currentMealDay];
+ mealData[currentMealDay][type]=meal;
+ state.mealPlanOverrides=state.mealPlanOverrides||{};
+ state.mealPlanOverrides[dateKey]={...(state.mealPlanOverrides[dateKey]||{}),[type]:meal.name};
+ save();closeMealSwap();renderMeals();showToast('Dish swapped for '+dateKey+'; your other daily meals stay the same.');
+}
+
+function generateShoppingList(){ const day=mealData[currentMealDay]||{}; let items=[]; Object.values(day).filter(Boolean).forEach(m=>m.ingredients.forEach(ing=>items.push(`${ing.item} — ${ing.qty*state.servings/2}${ing.unit}`))); document.getElementById('shoppingList').classList.remove('hidden'); document.getElementById('shoppingItems').innerHTML=items.map(i=>`<li>${i}</li>`).join(''); showToast('Shopping list ready 🧺'); document.getElementById('shoppingList').scrollIntoView({behavior:'smooth'}); }
 
 /* RECIPE */
 function openRecipe(m,type){ currentRecipe={...m,type}; state.servings=2; document.getElementById('servingsCount').textContent='2'; document.getElementById('recipeIcon').textContent=m.icon; document.getElementById('recipeMealType').textContent=type.toUpperCase(); document.getElementById('recipeTime').textContent='⏱ '+m.time+' min'; document.getElementById('recipeDifficulty').textContent=m.diff; document.getElementById('recipeCal').textContent=m.cal+' kcal'; document.getElementById('recipeTitle').textContent=m.name; document.getElementById('recipeSubtitle').textContent=(m.diet.includes('nonveg')||/chicken|egg|fish/i.test(m.name)?'Non-veg protein plate':'Balanced veg plate')+' • Comforting & familiar'; document.getElementById('recipeTip').textContent='Tip: '+m.tip; timerSeconds=m.time*60; updateTimerUI(); renderRecipeIngredients(); renderRecipeSteps(); document.getElementById('nutCal').textContent=m.cal; document.getElementById('nutProtein').textContent=(m.tags.includes('nonveg')||/chicken/i.test(m.name)?'28g':m.tags.includes('egg')?'16g':'14g'); document.getElementById('nutTime').textContent=m.time+'m'; document.getElementById('recipeModal').classList.remove('hidden'); switchRecipeTab('ingredients'); setPrepStyle('standard'); lucide.createIcons(); }
