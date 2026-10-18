@@ -137,11 +137,11 @@
 <div class="max-w-[1280px] mx-auto px-4 lg:px-6 h-[64px] flex items-center gap-4">
 <div class="flex items-center gap-3"><div class="w-9 h-9 rounded-xl bg-teal flex items-center justify-center text-white shadow"><i data-lucide="droplets" class="w-5 h-5"></i></div><div class="leading-none"><p class="font-extrabold tracking-tight text-[15px] font-display">VITALIS</p><p class="text-[10px] tracking-[0.14em] font-bold text-slate-400">SDG 3 • WELLBEING</p></div><span class="hidden sm:inline-flex ml-2 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">ACCOUNT</span></div>
 <div class="hidden lg:flex items-center gap-2 ml-5" role="group" aria-label="App mode">
-<button id="modeVitalis" onclick="setAppMode('vitalis')" class="modeToggle px-4 py-2 rounded-full border border-teal bg-teal text-white text-xs font-bold" aria-pressed="true">💧 Vitalis</button>
+<button id="modeVitalis" onclick="setAppMode('vitalis')" class="modeToggle px-4 py-2 rounded-full border border-teal bg-teal text-white text-xs font-bold" aria-pressed="true">💧 Vitalis Health</button>
 <button id="modeCommunities" onclick="setAppMode('communities')" class="modeToggle px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-bold hover:border-teal">✦ Vitalis Communities</button>
 </div>
 <div class="lg:hidden px-4 pb-3 flex gap-2 overflow-auto" role="group" aria-label="App mode">
-<button id="modeVitalisMobile" onclick="setAppMode('vitalis')" class="modeToggle shrink-0 px-3 py-2 rounded-full border border-teal bg-teal text-white text-xs font-bold" aria-pressed="true">💧 Vitalis</button>
+<button id="modeVitalisMobile" onclick="setAppMode('vitalis')" class="modeToggle shrink-0 px-3 py-2 rounded-full border border-teal bg-teal text-white text-xs font-bold" aria-pressed="true">💧 Vitalis Health</button>
 <button id="modeCommunitiesMobile" onclick="setAppMode('communities')" class="modeToggle shrink-0 px-3 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-bold">✦ Vitalis Communities</button>
 <select onchange="setLang(this.value)" class="ml-auto text-xs font-semibold px-2 py-1.5 rounded-full border bg-white"><option value="en">EN</option><option value="hi">HI</option></select>
 </div>
@@ -181,11 +181,18 @@
   <div class="relative max-w-3xl"><span class="inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/20 px-3 py-1.5 text-xs font-bold"><i data-lucide="users" class="w-4 h-4"></i> YOUR WELLBEING, TOGETHER</span>
    <h2 class="mt-4 text-3xl sm:text-4xl font-extrabold font-display">Move together.<br><span class="text-teal-100">Feel the difference.</span></h2>
    <p class="mt-3 text-white/85 max-w-xl leading-relaxed">Create a searchable Vitalis username, find people by username, and share the photos you choose on your profile.</p>
-   <div class="mt-5 flex flex-wrap gap-2"><a href="#communityDirectory" class="rounded-full bg-white text-teal-800 px-4 py-2.5 text-sm font-bold"><i data-lucide="user-round-search" class="w-4 h-4 inline mr-1"></i> Find people</a><button class="rounded-full bg-white/15 border border-white/25 px-4 py-2.5 text-sm font-bold" onclick="setAppMode('vitalis')">← Back to Vitalis</button></div>
+   <div class="mt-5 flex flex-wrap gap-2"><button type="button" onclick="openCommunityTab('search',true)" class="rounded-full bg-white text-teal-800 px-4 py-2.5 text-sm font-bold"><i data-lucide="user-round-search" class="w-4 h-4 inline mr-1"></i> Find people</button><button class="rounded-full bg-white/15 border border-white/25 px-4 py-2.5 text-sm font-bold" onclick="setAppMode('vitalis')">← Back to Vitalis Health</button></div>
   </div>
  </div>
  <div id="communityAccountStatus" class="hidden rounded-xl border px-4 py-3 text-sm" role="status" aria-live="polite"></div>
- <div class="grid lg:grid-cols-[.95fr_1.05fr] gap-4">
+ <nav class="communityTabs" role="tablist" aria-label="Vitalis Communities sections" onkeydown="navigateCommunityTabs(event)">
+  <button id="communityTabProfile" class="communityTab active" role="tab" aria-selected="true" aria-controls="communityPanelProfile" onclick="openCommunityTab('profile')"><i data-lucide="user-round" class="w-4 h-4"></i><span>Profile</span></button>
+  <button id="communityTabUpdates" class="communityTab" role="tab" aria-selected="false" aria-controls="communityPanelUpdates" onclick="openCommunityTab('updates')"><i data-lucide="newspaper" class="w-4 h-4"></i><span>Updates</span></button>
+  <button id="communityTabMessages" class="communityTab" role="tab" aria-selected="false" aria-controls="communityPanelMessages" onclick="openCommunityTab('messages')"><i data-lucide="messages-square" class="w-4 h-4"></i><span>Messages</span></button>
+  <button id="communityTabSearch" class="communityTab" role="tab" aria-selected="false" aria-controls="communityPanelSearch" onclick="openCommunityTab('search')"><i data-lucide="search" class="w-4 h-4"></i><span>Search people</span></button>
+  <button id="communityTabGroups" class="communityTab" role="tab" aria-selected="false" aria-controls="communityPanelGroups" onclick="openCommunityTab('groups')"><i data-lucide="users-round" class="w-4 h-4"></i><span>Communities</span></button>
+ </nav>
+ <section id="communityPanelProfile" class="communityTabPanel active" role="tabpanel" aria-labelledby="communityTabProfile">
   <div class="communityPanel">
    <div class="flex items-start justify-between gap-3"><div><p class="text-xs font-bold tracking-[.14em] text-teal">YOUR PROFILE</p><h3 class="text-xl font-extrabold font-display mt-1">Your Vitalis identity</h3></div><span id="communityProfileBadge" class="hidden rounded-full bg-teal-50 text-teal border border-teal/20 px-3 py-1 text-xs font-bold"></span></div>
    <p class="text-xs text-slate-500 mt-2">Choose a unique username people can search. Only your display name, bio, profile photo, and gallery photos are shared; your health and activity records stay private.</p>
@@ -204,6 +211,24 @@
     <div id="communityOwnGallery" class="communityPhotoGrid mt-4"></div>
    </div>
   </div>
+ </section>
+ <section id="communityPanelUpdates" class="communityTabPanel" role="tabpanel" aria-labelledby="communityTabUpdates" hidden>
+  <div class="communityPanel communityComingSoon">
+   <span class="communityEmptyIcon"><i data-lucide="newspaper" class="w-6 h-6"></i></span>
+   <p class="mt-4 text-xs font-bold tracking-[.14em] text-teal">COMMUNITY UPDATES</p>
+   <h3 class="mt-1 text-xl font-extrabold font-display">A thoughtful fitness feed</h3>
+   <p class="mt-2 max-w-lg text-sm leading-relaxed text-slate-500">Member posts and activity updates will appear here once the community feed and moderation tools are connected. Your wellness records will never be shared automatically.</p>
+  </div>
+ </section>
+ <section id="communityPanelMessages" class="communityTabPanel" role="tabpanel" aria-labelledby="communityTabMessages" hidden>
+  <div class="communityPanel communityComingSoon">
+   <span class="communityEmptyIcon"><i data-lucide="messages-square" class="w-6 h-6"></i></span>
+   <p class="mt-4 text-xs font-bold tracking-[.14em] text-teal">MESSAGES</p>
+   <h3 class="mt-1 text-xl font-extrabold font-display">Conversations, with control</h3>
+   <p class="mt-2 max-w-lg text-sm leading-relaxed text-slate-500">Private messaging will be enabled when secure conversations, block/report controls, and notification settings are ready.</p>
+  </div>
+ </section>
+ <section id="communityPanelSearch" class="communityTabPanel" role="tabpanel" aria-labelledby="communityTabSearch" hidden>
   <div id="communityDirectory" class="space-y-4">
    <div class="communityPanel">
     <p class="text-xs font-bold tracking-[.14em] text-teal">PEOPLE</p><h3 class="text-xl font-extrabold font-display mt-1">Find your people</h3><p class="text-xs text-slate-500 mt-2">Search the exact username or the beginning of a username.</p>
@@ -214,7 +239,15 @@
    <div id="communityViewedProfile" class="hidden communityPanel"></div>
    <div class="communitySafety"><i data-lucide="shield-check" class="w-5 h-5 shrink-0"></i><div><p class="font-bold text-sm">Your health data stays yours</p><p class="text-xs mt-1 leading-relaxed">Profiles are private until you choose to make them searchable. VITALIS never publishes your workouts, hydration, meals, or fitness score in the directory.</p></div></div>
   </div>
- </div>
+ </section>
+ <section id="communityPanelGroups" class="communityTabPanel" role="tabpanel" aria-labelledby="communityTabGroups" hidden>
+  <div class="communityPanel communityComingSoon">
+   <span class="communityEmptyIcon"><i data-lucide="users-round" class="w-6 h-6"></i></span>
+   <p class="mt-4 text-xs font-bold tracking-[.14em] text-teal">ACTIVITY COMMUNITIES</p>
+   <h3 class="mt-1 text-xl font-extrabold font-display">Find your next group</h3>
+   <p class="mt-2 max-w-lg text-sm leading-relaxed text-slate-500">Local activity groups and upcoming events will show here after group membership, event details, and organizer verification are connected.</p>
+  </div>
+ </section>
 </section>
 <!-- DASHBOARD -->
 <section id="view-dashboard" class="view active space-y-4">
