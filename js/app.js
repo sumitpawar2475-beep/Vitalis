@@ -11,6 +11,7 @@ function freshState(user=null){ return {...defaultState,user,hydration:{...defau
 let state=freshState();
 let currentUserId=null, loadingAccountId=null, loadingAccountPromise=null, cloudSaveTimer=null, cloudSaveQueue=Promise.resolve();
 let passwordRecoveryActive=false;
+let communityProfile=null, communityProfileOwnerId=null, communityProfileLoaded=false, communityLoadingUserId=null, communityLoadPromise=null, communitySearchTimer=null, communityOwnPhotos=[];
 let authMode='signin', currentStep=1, currentMealDay=(new Date().getDay()+6)%7, mealData=[], mealPlanBuiltForWeek=null, mealPlanLastSeenDate=todayStr(), activeMealSwapType=null, mealSwapCandidates=[], chartInstance=null, burnChartInstance=null, timerInterval=null, timerSeconds=1200, timerRunning=false, currentRecipe=null, currentAudio=null, currentTrackIdx=-1, musicProgressInt=null;
 
 let demoProfiles={
@@ -93,7 +94,7 @@ function queueCloudSave(ownerId,snapshot){
 }
 async function flushCloudSave(){ if(cloudSaveTimer){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; if(currentUserId) await queueCloudSave(currentUserId,JSON.parse(JSON.stringify(state))); } await cloudSaveQueue; }
 function showAuthStatus(message,isError=false){ const el=document.getElementById('authStatus'); if(!el) return; el.textContent=message; el.classList.remove('hidden','bg-teal-50','border-teal/20','text-teal-dark','bg-rose-50','border-rose-200','text-rose-700'); el.classList.add(isError?'bg-rose-50':'bg-teal-50',isError?'border-rose-200':'border-teal/20',isError?'text-rose-700':'text-teal-dark'); }
-function showSignedOut(){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; currentUserId=null; loadingAccountId=null; loadingAccountPromise=null; state=freshState(); document.getElementById('app').classList.add('hidden'); document.getElementById('profileSetup').classList.add('hidden'); document.getElementById('loginScreen').classList.remove('hidden'); const pwd=document.getElementById('authPwd'); if(pwd) pwd.value=''; applyTheme(false); }
+function showSignedOut(){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; currentUserId=null; loadingAccountId=null; loadingAccountPromise=null; communityProfile=null;communityProfileOwnerId=null;communityProfileLoaded=false;communityLoadingUserId=null;communityLoadPromise=null;communityOwnPhotos=[]; state=freshState(); document.getElementById('app').classList.add('hidden'); document.getElementById('profileSetup').classList.add('hidden'); document.getElementById('loginScreen').classList.remove('hidden'); const pwd=document.getElementById('authPwd'); if(pwd) pwd.value=''; applyTheme(false); }
 async function loadAccount(session){
  const user=session?.user; if(!user||!supabaseClient) return;
  if(currentUserId===user.id) return;
@@ -108,6 +109,7 @@ async function loadAccount(session){
    const saved=data?.state||{};
    state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null,workoutFeedback:saved.workoutFeedback||{},workoutAttendance:saved.workoutAttendance||{},mealPlanVersion:Number(saved.mealPlanVersion)||0,mealPlanOverrides:saved.mealPlanOverrides||{},workoutTrackingStartDate:saved.workoutTrackingStartDate||null};
    currentUserId=user.id;
+   communityProfile=null;communityProfileOwnerId=null;communityProfileLoaded=false;communityLoadingUserId=null;communityLoadPromise=null;communityOwnPhotos=[];
    syncDailyPlan();
    applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
    if(state.profile) showApp(true); else showProfileSetup();
@@ -987,16 +989,183 @@ const p=state.profile||demoProfiles.adults;
 document.getElementById('settingsProfileSummary').innerHTML=`<p class="font-bold">${p.name} • ${p.age}y • ${p.sex}</p><p class="text-xs text-slate-500 mt-1">${Math.round(p.height)}cm • ${Math.round(p.weight)}kg • BMI ${calcBmi(p).toFixed(1)} • ${p.diet} • ${p.activity} • 💤 ${p.sleep}h • 🎯 ${p.goal}</p><p class="text-[11px] text-slate-400 mt-1">Water ${(state.hydration.goal/1000).toFixed(1)}L • Workouts logged: ${(state.workoutLogs||[]).length} • Streak days: ${Object.values(state.streakMap).filter(Boolean).length}</p>`;
 renderHeaderAvatar();
 }
+function communityEscape(value){ return String(value==null?'':value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function setCommunityStatus(message,isError=false){
+ const el=document.getElementById('communityAccountStatus'); if(!el) return;
+ if(!message){el.classList.add('hidden');el.textContent='';return;}
+ el.className='rounded-xl border px-4 py-3 text-sm '+(isError?'bg-rose-50 border-rose-200 text-rose-700':'bg-teal-50 border-teal/20 text-teal-dark');
+ el.textContent=message;
+}
+function communityErrorMessage(error){
+ const message=String(error?.message||'');
+ if(error?.code==='42P01'||error?.code==='PGRST205'||/community_profiles|community_photos|community-media|schema cache|bucket not found/i.test(message)) return 'Communities needs its Supabase tables and photo bucket. Run the full supabase/schema.sql file in the Supabase SQL Editor.';
+ if(error?.code==='23505'||/duplicate key|unique constraint/i.test(message)) return 'That username is already taken. Try another one.';
+ if(error?.code==='42501'||/row-level security|permission denied/i.test(message)) return 'Supabase blocked this action. Re-run supabase/schema.sql to apply the Communities access policies.';
+ if(error?.name==='AbortError') return 'The request timed out. Check your connection and try again.';
+ return message||'Could not connect to Communities. Check your connection and try again.';
+}
+function communityInitial(name){return communityEscape((String(name||'V').trim()[0]||'V').toUpperCase());}
+function signedCommunityImage(path){
+ if(!path) return Promise.resolve('');
+ return supabaseClient.storage.from('community-media').createSignedUrl(path,300).then(({data,error})=>{if(error)throw error;return data?.signedUrl||'';});
+}
+function renderCommunityEditor(){
+ const form=document.getElementById('communityProfileForm'),media=document.getElementById('communityProfileMedia'),badge=document.getElementById('communityProfileBadge'),saveButton=document.getElementById('communityProfileSave');
+ if(!form) return;
+ const profile=communityProfile;
+ document.getElementById('communityUsername').value=profile?.username||'';
+ document.getElementById('communityDisplayName').value=profile?.display_name||state.profile?.name||'';
+ document.getElementById('communityBio').value=profile?.bio||'';
+ document.getElementById('communityPublic').checked=!!profile?.is_public;
+ media.classList.toggle('hidden',!profile);
+ badge.classList.toggle('hidden',!profile);
+ badge.textContent=profile?(profile.is_public?'Searchable':'Private'):'';
+ saveButton.textContent=profile?'Save profile':'Create community profile';
+ const avatar=document.getElementById('communityAvatarPreview');
+ if(!profile?.avatar_path){avatar.textContent=communityInitial(profile?.display_name||state.profile?.name);avatar.innerHTML=communityInitial(profile?.display_name||state.profile?.name);}
+ else signedCommunityImage(profile.avatar_path).then(url=>{if(communityProfileOwnerId===currentUserId&&url)avatar.innerHTML='<img src="'+communityEscape(url)+'" alt="Your community profile photo" class="w-full h-full object-cover">';}).catch(error=>{console.error('Community avatar load failed:',error);});
+}
+async function renderCommunityGallery(targetId,photos,isOwner){
+ const grid=document.getElementById(targetId); if(!grid) return;
+ if(!photos?.length){grid.innerHTML='<div class="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-xs text-slate-500">'+(isOwner?'Your grid is empty. Add a photo when you are ready to share.':'No photos have been shared yet.')+'</div>';return;}
+ const items=await Promise.all(photos.map(async photo=>({photo,url:await signedCommunityImage(photo.photo_path)})));
+ grid.innerHTML=items.map(({photo,url})=>'<figure class="communityPhotoTile"><img src="'+communityEscape(url)+'" alt="'+communityEscape(photo.caption||'Community profile photo')+'" loading="lazy">'+(isOwner?'<button type="button" class="communityPhotoDelete" data-community-delete="'+communityEscape(photo.id)+'" aria-label="Remove photo">×</button>':'')+(photo.caption?'<figcaption>'+communityEscape(photo.caption)+'</figcaption>':'')+'</figure>').join('');
+ if(isOwner) grid.onclick=event=>{const button=event.target.closest('[data-community-delete]');if(button)deleteCommunityPhoto(button.dataset.communityDelete);};
+}
+async function refreshOwnCommunityGallery(){
+ if(!communityProfile||!currentUserId) return;
+ const {data,error}=await supabaseClient.from('community_photos').select('id,user_id,photo_path,caption,created_at').eq('user_id',currentUserId).order('created_at',{ascending:false}).limit(12);
+ if(error) throw error;
+ communityOwnPhotos=data||[];
+ await renderCommunityGallery('communityOwnGallery',communityOwnPhotos,true);
+}
+async function loadCommunityHome(force=false){
+ if(!supabaseClient||!currentUserId){setCommunityStatus('Sign in to your VITALIS account before using Communities.',true);return;}
+ if(!force&&communityProfileLoaded&&communityProfileOwnerId===currentUserId) return;
+ if(communityLoadingUserId===currentUserId&&communityLoadPromise) return communityLoadPromise;
+ const owner=currentUserId;
+ communityLoadingUserId=owner;
+ setCommunityStatus('Loading your community profile…');
+ communityLoadPromise=(async()=>{
+  try{
+   const {data,error}=await supabaseClient.from('community_profiles').select('user_id,username,display_name,bio,avatar_path,is_public,created_at,updated_at').eq('user_id',owner).maybeSingle();
+   if(error) throw error;
+   if(currentUserId!==owner)return;
+   communityProfile=data||null;communityProfileOwnerId=owner;communityProfileLoaded=true;
+   renderCommunityEditor();
+   if(data){await refreshOwnCommunityGallery();setCommunityStatus(data.is_public?'Your profile is searchable by username.':'Your profile is private and does not appear in search.');}
+   else{communityOwnPhotos=[];document.getElementById('communityOwnGallery').innerHTML='';setCommunityStatus('Choose a unique username to create your Communities profile. It stays private until you make it searchable.');}
+  }catch(error){console.error('VITALIS Communities load failed:',error);if(currentUserId===owner)setCommunityStatus(communityErrorMessage(error),true);}
+  finally{if(communityLoadingUserId===owner){communityLoadingUserId=null;communityLoadPromise=null;}}
+ })();
+ return communityLoadPromise;
+}
+async function saveCommunityProfile(event){
+ event?.preventDefault();
+ if(!supabaseClient||!currentUserId){setCommunityStatus('Sign in before creating your Communities profile.',true);return;}
+ const username=document.getElementById('communityUsername').value.trim().replace(/^@/,'').toLowerCase();
+ const displayName=document.getElementById('communityDisplayName').value.trim();
+ const bio=document.getElementById('communityBio').value.trim();
+ const isPublic=document.getElementById('communityPublic').checked;
+ const reserved=['admin','administrator','vitalis','support','moderator','staff'];
+ if(!/^[a-z0-9_]{3,20}$/.test(username)){setCommunityStatus('Username must be 3–20 lowercase letters, numbers, or underscores.',true);return;}
+ if(reserved.includes(username)){setCommunityStatus('That username is reserved. Choose another one.',true);return;}
+ if(displayName.length<2||displayName.length>40||bio.length>160){setCommunityStatus('Check the display name and bio lengths, then try again.',true);return;}
+ const button=document.getElementById('communityProfileSave');button.disabled=true;button.classList.add('opacity-60');
+ try{
+  const payload={user_id:currentUserId,username,display_name:displayName,bio,is_public:isPublic,updated_at:new Date().toISOString()};
+  const {data,error}=await supabaseClient.from('community_profiles').upsert(payload,{onConflict:'user_id'}).select('user_id,username,display_name,bio,avatar_path,is_public,created_at,updated_at').single();
+  if(error)throw error;
+  communityProfile=data;communityProfileOwnerId=currentUserId;communityProfileLoaded=true;renderCommunityEditor();await refreshOwnCommunityGallery();
+  setCommunityStatus(data.is_public?'Profile saved. People can now find you by @'+data.username+'.':'Profile saved privately. Turn on search visibility whenever you are ready.');
+ }catch(error){console.error('VITALIS community profile save failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
+ finally{button.disabled=false;button.classList.remove('opacity-60');}
+}
+async function uploadCommunityImage(event,kind){
+ const input=event?.target,file=input?.files?.[0];if(!file)return;
+ try{
+  if(!communityProfile||!currentUserId)throw new Error('Create and save your community username before adding photos.');
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Choose a JPG, PNG, or WebP image.');
+  if(file.size>5242880)throw new Error('Each image must be 5 MB or smaller.');
+  if(kind==='gallery'&&communityOwnPhotos.length>=12)throw new Error('Your profile grid can contain up to 12 photos.');
+  setCommunityStatus('Uploading your photo…');
+  const ext=file.type==='image/jpeg'?'jpg':file.type==='image/png'?'png':'webp';
+  const folder=kind==='avatar'?'avatars':'photos';
+  const path=currentUserId+'/'+folder+'/'+crypto.randomUUID()+'.'+ext;
+  const {error:uploadError}=await supabaseClient.storage.from('community-media').upload(path,file,{cacheControl:'3600',upsert:false,contentType:file.type});
+  if(uploadError)throw uploadError;
+  if(kind==='avatar'){
+   const previous=communityProfile.avatar_path;
+   const {data,error}=await supabaseClient.from('community_profiles').update({avatar_path:path,updated_at:new Date().toISOString()}).eq('user_id',currentUserId).select('user_id,username,display_name,bio,avatar_path,is_public,created_at,updated_at').single();
+   if(error){await supabaseClient.storage.from('community-media').remove([path]);throw error;}
+   communityProfile=data;renderCommunityEditor();
+   if(previous)await supabaseClient.storage.from('community-media').remove([previous]);
+   setCommunityStatus('Profile photo updated.');
+  }else{
+   const caption=document.getElementById('communityPhotoCaption').value.trim();
+   const {error:insertError}=await supabaseClient.from('community_photos').insert({user_id:currentUserId,photo_path:path,caption});
+   if(insertError){await supabaseClient.storage.from('community-media').remove([path]);throw insertError;}
+   document.getElementById('communityPhotoCaption').value='';
+   await refreshOwnCommunityGallery();setCommunityStatus('Photo added to your profile grid.');
+  }
+ }catch(error){console.error('VITALIS community image upload failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
+ finally{if(input)input.value='';}
+}
+async function deleteCommunityPhoto(photoId){
+ const photo=communityOwnPhotos.find(item=>item.id===photoId);if(!photo||photo.user_id!==currentUserId)return;
+ if(!confirm('Remove this photo from your community profile?'))return;
+ try{
+  const {error}=await supabaseClient.from('community_photos').delete().eq('id',photoId).eq('user_id',currentUserId);if(error)throw error;
+  const {error:storageError}=await supabaseClient.storage.from('community-media').remove([photo.photo_path]);
+  if(storageError)console.error('Community photo storage cleanup failed:',storageError);
+  await refreshOwnCommunityGallery();setCommunityStatus('Photo removed from your profile.');
+ }catch(error){console.error('VITALIS community photo delete failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
+}
+async function searchCommunityProfiles(event){
+ event?.preventDefault();
+ const field=document.getElementById('communitySearchInput'),status=document.getElementById('communitySearchStatus'),results=document.getElementById('communitySearchResults');
+ const query=field.value.trim().replace(/^@/,'').toLowerCase();
+ results.innerHTML='';
+ if(!supabaseClient||!currentUserId){status.textContent='Sign in to search for Vitalis members.';return;}
+ if(!/^[a-z0-9_]{2,20}$/.test(query)){status.textContent='Enter at least two letters, numbers, or underscores.';return;}
+ status.textContent='Searching…';
+ try{
+  const {data,error}=await supabaseClient.from('community_profiles').select('user_id,username,display_name,bio,avatar_path').eq('is_public',true).ilike('username',query+'%').order('username').limit(12);
+  if(error)throw error;
+  if(!data?.length){status.textContent='No searchable profiles match @'+query+'.';return;}
+  status.textContent=data.length+' profile'+(data.length===1?'':'s')+' found.';
+  const cards=await Promise.all(data.map(async profile=>{
+   let avatar='';try{avatar=await signedCommunityImage(profile.avatar_path);}catch(error){console.error('Community search avatar load failed:',error);}
+   return '<button type="button" class="communityMember" data-community-open="'+communityEscape(profile.user_id)+'"><span class="communityMemberAvatar">'+(avatar?'<img src="'+communityEscape(avatar)+'" alt="">':communityInitial(profile.display_name))+'</span><span class="min-w-0 flex-1"><span class="block font-bold text-sm truncate">'+communityEscape(profile.display_name)+'</span><span class="block text-xs text-teal font-semibold">@'+communityEscape(profile.username)+'</span><span class="communityMemberBio block text-xs text-slate-500 mt-1">'+communityEscape(profile.bio||'Vitalis member')+'</span></span><span class="text-teal font-bold" aria-hidden="true">→</span></button>';
+  }));
+  results.innerHTML=cards.join('');
+  results.onclick=event=>{const button=event.target.closest('[data-community-open]');if(button)openCommunityProfile(button.dataset.communityOpen);};
+ }catch(error){console.error('VITALIS community search failed:',error);status.textContent=communityErrorMessage(error);}
+}
+async function openCommunityProfile(userId){
+ if(!/^[0-9a-f-]{36}$/i.test(userId))return;
+ const panel=document.getElementById('communityViewedProfile');panel.classList.remove('hidden');panel.innerHTML='<p class="text-sm text-slate-500">Loading profile…</p>';
+ try{
+  const {data:profile,error}=await supabaseClient.from('community_profiles').select('user_id,username,display_name,bio,avatar_path,is_public').eq('user_id',userId).eq('is_public',true).maybeSingle();
+  if(error)throw error;
+  if(!profile){panel.innerHTML='<p class="text-sm text-slate-600">This profile is private or no longer available.</p>';return;}
+  let avatar='';if(profile.avatar_path)avatar=await signedCommunityImage(profile.avatar_path);
+  const {data:photos,error:photoError}=await supabaseClient.from('community_photos').select('id,user_id,photo_path,caption,created_at').eq('user_id',userId).order('created_at',{ascending:false}).limit(12);
+  if(photoError)throw photoError;
+  panel.innerHTML='<div class="flex items-start gap-3"><div class="communityMemberAvatar !w-16 !h-16 text-xl">'+(avatar?'<img src="'+communityEscape(avatar)+'" alt="'+communityEscape(profile.display_name)+'">':communityInitial(profile.display_name))+'</div><div class="flex-1 min-w-0"><p class="text-xs font-bold tracking-[.14em] text-teal">VITALIS MEMBER</p><h3 class="text-xl font-extrabold font-display mt-1">'+communityEscape(profile.display_name)+'</h3><p class="text-sm text-teal font-semibold">@'+communityEscape(profile.username)+'</p><p class="text-sm text-slate-600 mt-2 whitespace-pre-line">'+communityEscape(profile.bio||'')+'</p></div><button type="button" class="text-slate-400 hover:text-slate-700" onclick="document.getElementById(\'communityViewedProfile\').classList.add(\'hidden\')" aria-label="Close profile">✕</button></div><div class="mt-5"><p class="text-xs font-bold tracking-[.14em] text-teal mb-3">PHOTO GRID</p><div id="communityViewedGallery" class="communityPhotoGrid"></div></div>';
+  await renderCommunityGallery('communityViewedGallery',photos||[],false);
+ }catch(error){console.error('VITALIS community profile open failed:',error);panel.innerHTML='<p class="text-sm text-rose-700">'+communityEscape(communityErrorMessage(error))+'</p>';}
+}
 function renderAppMode(){
-const isCommunities=state.appMode==='communities';
-document.getElementById('app').classList.toggle('community-mode',isCommunities);
-document.querySelectorAll('.modeToggle').forEach(button=>{
-const active=button.id.includes('Communities')?isCommunities:!isCommunities;
-button.classList.toggle('bg-teal',active); button.classList.toggle('text-white',active); button.classList.toggle('border-teal',active);
-button.classList.toggle('bg-white',!active); button.classList.toggle('text-slate-700',!active); button.classList.toggle('border-slate-200',!active);
-button.setAttribute('aria-pressed',String(active));
-});
-if(isCommunities){document.querySelectorAll('.view').forEach(view=>view.classList.remove('active'));document.getElementById('view-communities').classList.add('active');}
+ const isCommunities=state.appMode==='communities';
+ document.getElementById('app').classList.toggle('community-mode',isCommunities);
+ document.querySelectorAll('.modeToggle').forEach(button=>{
+  const active=button.id.includes('Communities')?isCommunities:!isCommunities;
+  button.classList.toggle('bg-teal',active); button.classList.toggle('text-white',active); button.classList.toggle('border-teal',active);
+  button.classList.toggle('bg-white',!active); button.classList.toggle('text-slate-700',!active); button.classList.toggle('border-slate-200',!active);
+  button.setAttribute('aria-pressed',String(active));
+ });
+ if(isCommunities){document.querySelectorAll('.view').forEach(view=>view.classList.remove('active'));document.getElementById('view-communities').classList.add('active');loadCommunityHome();}
 }
 function setAppMode(mode,doSave=true){
 if(mode==='communities') state.appMode='communities'; else state.appMode='vitalis';
