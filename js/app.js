@@ -1167,16 +1167,6 @@ function renderAppMode(){
  });
  if(isCommunities){document.querySelectorAll('.view').forEach(view=>view.classList.remove('active'));document.getElementById('view-communities').classList.add('active');loadCommunityHome();}
 }
-const isCommunities=state.appMode==='communities';
-document.getElementById('app').classList.toggle('community-mode',isCommunities);
-document.querySelectorAll('.modeToggle').forEach(button=>{
-const active=button.id.includes('Communities')?isCommunities:!isCommunities;
-button.classList.toggle('bg-teal',active); button.classList.toggle('text-white',active); button.classList.toggle('border-teal',active);
-button.classList.toggle('bg-white',!active); button.classList.toggle('text-slate-700',!active); button.classList.toggle('border-slate-200',!active);
-button.setAttribute('aria-pressed',String(active));
-});
-if(isCommunities){document.querySelectorAll('.view').forEach(view=>view.classList.remove('active'));document.getElementById('view-communities').classList.add('active');}
-}
 function setAppMode(mode,doSave=true){
 if(mode==='communities') state.appMode='communities'; else state.appMode='vitalis';
 if(doSave) save();
