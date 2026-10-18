@@ -11,7 +11,7 @@ function freshState(user=null){ return {...defaultState,user,hydration:{...defau
 let state=freshState();
 let currentUserId=null, loadingAccountId=null, loadingAccountPromise=null, cloudSaveTimer=null, cloudSaveQueue=Promise.resolve();
 let passwordRecoveryActive=false;
-let communityProfile=null, communityProfileOwnerId=null, communityProfileLoaded=false, communityLoadingUserId=null, communityLoadPromise=null, communitySearchTimer=null, communityOwnPhotos=[], activeCommunityTab='profile', communityGroups=[], communityMemberships=[], activeCommunityId=null;
+let communityProfile=null, communityProfileOwnerId=null, communityProfileLoaded=false, communityLoadingUserId=null, communityLoadPromise=null, communitySearchTimer=null, communityOwnPhotos=[], activeCommunityTab='profile', communityGroups=[], communityMemberships=[], activeCommunityId=null, communityFollowedIds=new Set(), communityDirectConversations=[], communityDirectProfiles={}, activeDirectConversationId=null, activeDirectRecipient=null;
 let authMode='signin', currentStep=1, currentMealDay=(new Date().getDay()+6)%7, mealData=[], mealPlanBuiltForWeek=null, mealPlanLastSeenDate=todayStr(), activeMealSwapType=null, mealSwapCandidates=[], chartInstance=null, burnChartInstance=null, timerInterval=null, timerSeconds=1200, timerRunning=false, currentRecipe=null, currentAudio=null, currentTrackIdx=-1, musicProgressInt=null;
 
 let demoProfiles={
@@ -94,7 +94,7 @@ function queueCloudSave(ownerId,snapshot){
 }
 async function flushCloudSave(){ if(cloudSaveTimer){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; if(currentUserId) await queueCloudSave(currentUserId,JSON.parse(JSON.stringify(state))); } await cloudSaveQueue; }
 function showAuthStatus(message,isError=false){ const el=document.getElementById('authStatus'); if(!el) return; el.textContent=message; el.classList.remove('hidden','bg-teal-50','border-teal/20','text-teal-dark','bg-rose-50','border-rose-200','text-rose-700'); el.classList.add(isError?'bg-rose-50':'bg-teal-50',isError?'border-rose-200':'border-teal/20',isError?'text-rose-700':'text-teal-dark'); }
-function showSignedOut(){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; currentUserId=null; loadingAccountId=null; loadingAccountPromise=null; communityProfile=null;communityProfileOwnerId=null;communityProfileLoaded=false;communityLoadingUserId=null;communityLoadPromise=null;communityOwnPhotos=[];communityGroups=[];communityMemberships=[];activeCommunityId=null; state=freshState(); document.getElementById('app').classList.add('hidden'); document.getElementById('profileSetup').classList.add('hidden'); document.getElementById('loginScreen').classList.remove('hidden'); const pwd=document.getElementById('authPwd'); if(pwd) pwd.value=''; applyTheme(false); }
+function showSignedOut(){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; currentUserId=null; loadingAccountId=null; loadingAccountPromise=null; communityProfile=null;communityProfileOwnerId=null;communityProfileLoaded=false;communityLoadingUserId=null;communityLoadPromise=null;communityOwnPhotos=[];communityGroups=[];communityMemberships=[];activeCommunityId=null;communityFollowedIds=new Set();communityDirectConversations=[];communityDirectProfiles={};activeDirectConversationId=null;activeDirectRecipient=null; state=freshState(); document.getElementById('app').classList.add('hidden'); document.getElementById('profileSetup').classList.add('hidden'); document.getElementById('loginScreen').classList.remove('hidden'); const pwd=document.getElementById('authPwd'); if(pwd) pwd.value=''; applyTheme(false); }
 async function loadAccount(session){
  const user=session?.user; if(!user||!supabaseClient) return;
  if(currentUserId===user.id) return;
@@ -109,7 +109,7 @@ async function loadAccount(session){
    const saved=data?.state||{};
    state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null,workoutFeedback:saved.workoutFeedback||{},workoutAttendance:saved.workoutAttendance||{},mealPlanVersion:Number(saved.mealPlanVersion)||0,mealPlanOverrides:saved.mealPlanOverrides||{},workoutTrackingStartDate:saved.workoutTrackingStartDate||null};
    currentUserId=user.id;
-   communityProfile=null;communityProfileOwnerId=null;communityProfileLoaded=false;communityLoadingUserId=null;communityLoadPromise=null;communityOwnPhotos=[];communityGroups=[];communityMemberships=[];activeCommunityId=null;
+   communityProfile=null;communityProfileOwnerId=null;communityProfileLoaded=false;communityLoadingUserId=null;communityLoadPromise=null;communityOwnPhotos=[];communityGroups=[];communityMemberships=[];activeCommunityId=null;communityFollowedIds=new Set();communityDirectConversations=[];communityDirectProfiles={};activeDirectConversationId=null;activeDirectRecipient=null;
    syncDailyPlan();
    applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
    if(state.profile) showApp(true); else showProfileSetup();
@@ -999,7 +999,7 @@ function setCommunityStatus(message,isError=false){
 function isCommunityAdult(){return Number(state.profile?.age)>=18;}
 function communityErrorMessage(error){
  const message=String(error?.message||'');
- if(error?.code==='42P01'||error?.code==='PGRST205'||/community_profiles|community_photos|community-media|schema cache|bucket not found/i.test(message)) return 'Communities needs its Supabase tables and photo bucket. Run the full supabase/schema.sql file in the Supabase SQL Editor.';
+ if(error?.code==='42P01'||error?.code==='PGRST205'||/community|schema cache|bucket not found/i.test(message)) return 'Communities needs its Supabase schema and private photo bucket. Apply the full supabase/schema.sql file in the Supabase SQL Editor.';
  if(error?.code==='23505'||/duplicate key|unique constraint/i.test(message)) return 'That username is already taken. Try another one.';
  if(error?.code==='42501'||/row-level security|permission denied/i.test(message)) return 'Supabase blocked this action. Re-run supabase/schema.sql to apply the Communities access policies.';
  if(error?.name==='AbortError') return 'The request timed out. Check your connection and try again.';
@@ -1043,7 +1043,7 @@ async function refreshOwnCommunityGallery(){
 async function loadCommunityHome(force=false){
  if(!supabaseClient||!currentUserId){setCommunityStatus('Sign in to your VITALIS account before using Communities.',true);return;}
  if(!isCommunityAdult()){setCommunityStatus('The Vitalis Communities beta is currently for members aged 18 and over.',true);return;}
- if(!force&&communityProfileLoaded&&communityProfileOwnerId===currentUserId){await loadCommunities();await Promise.all([loadCommunityFeed(),loadCommunityThreads()]);return;}
+ if(!force&&communityProfileLoaded&&communityProfileOwnerId===currentUserId){await loadCommunities();await Promise.all([loadCommunityFeed(),loadCommunityThreads(),loadCommunityFollowState(),loadCommunityDirectInbox()]);return;}
  if(communityLoadingUserId===currentUserId&&communityLoadPromise) return communityLoadPromise;
  const owner=currentUserId;
  communityLoadingUserId=owner;
@@ -1062,7 +1062,7 @@ async function loadCommunityHome(force=false){
  })();
  await communityLoadPromise;
  await loadCommunities();
- await Promise.all([loadCommunityFeed(),loadCommunityThreads()]);
+ await Promise.all([loadCommunityFeed(),loadCommunityThreads(),loadCommunityFollowState(),loadCommunityDirectInbox()]);
 }
 async function saveCommunityProfile(event){
  event?.preventDefault();
@@ -1143,10 +1143,11 @@ async function searchCommunityProfiles(event){
   status.textContent=data.length+' profile'+(data.length===1?'':'s')+' found.';
   const cards=await Promise.all(data.map(async profile=>{
    let avatar='';try{avatar=await signedCommunityImage(profile.avatar_path);}catch(error){console.error('Community search avatar load failed:',error);}
-   return '<button type="button" class="communityMember" data-community-open="'+communityEscape(profile.user_id)+'"><span class="communityMemberAvatar">'+(avatar?'<img src="'+communityEscape(avatar)+'" alt="">':communityInitial(profile.display_name))+'</span><span class="min-w-0 flex-1"><span class="block font-bold text-sm truncate">'+communityEscape(profile.display_name)+'</span><span class="block text-xs text-teal font-semibold">@'+communityEscape(profile.username)+'</span><span class="communityMemberBio block text-xs text-slate-500 mt-1">'+communityEscape(profile.bio||'Vitalis member')+'</span></span><span class="text-teal font-bold" aria-hidden="true">→</span></button>';
+   const followed=communityFollowedIds.has(profile.user_id);
+   return '<article class="communityMemberCard"><button type="button" class="communityMember" data-community-open="'+communityEscape(profile.user_id)+'"><span class="communityMemberAvatar">'+(avatar?'<img src="'+communityEscape(avatar)+'" alt="">':communityInitial(profile.display_name))+'</span><span class="min-w-0 flex-1"><span class="block font-bold text-sm truncate">'+communityEscape(profile.display_name)+'</span><span class="block text-xs text-teal font-semibold">@'+communityEscape(profile.username)+'</span><span class="communityMemberBio block text-xs text-slate-500 mt-1">'+communityEscape(profile.bio||'Vitalis member')+'</span></span><span class="text-teal font-bold" aria-hidden="true">Profile</span></button><div class="communityMemberActions"><button type="button" class="communityFollowButton'+(followed?' following':'')+'" data-community-follow="'+communityEscape(profile.user_id)+'">'+(followed?'Following':'Follow')+'</button><button type="button" class="communityMessagePersonButton" data-community-message="'+communityEscape(profile.user_id)+'">Message</button></div></article>';
   }));
   results.innerHTML=cards.join('');
-  results.onclick=event=>{const button=event.target.closest('[data-community-open]');if(button)openCommunityProfile(button.dataset.communityOpen);};
+  results.onclick=event=>{const follow=event.target.closest('[data-community-follow]'),message=event.target.closest('[data-community-message]'),open=event.target.closest('[data-community-open]');if(follow)toggleCommunityFollow(follow.dataset.communityFollow,follow);else if(message)messageCommunityPerson(message.dataset.communityMessage);else if(open)openCommunityProfile(open.dataset.communityOpen);};
  }catch(error){console.error('VITALIS community search failed:',error);status.textContent=communityErrorMessage(error);}
 }
 async function openCommunityProfile(userId){
@@ -1160,9 +1161,53 @@ async function openCommunityProfile(userId){
   let avatar='';if(profile.avatar_path)avatar=await signedCommunityImage(profile.avatar_path);
   const {data:photos,error:photoError}=await supabaseClient.from('community_photos').select('id,user_id,photo_path,caption,created_at').eq('user_id',userId).order('created_at',{ascending:false}).limit(12);
   if(photoError)throw photoError;
-  panel.innerHTML='<div class="flex items-start gap-3"><div class="communityMemberAvatar !w-16 !h-16 text-xl">'+(avatar?'<img src="'+communityEscape(avatar)+'" alt="'+communityEscape(profile.display_name)+'">':communityInitial(profile.display_name))+'</div><div class="flex-1 min-w-0"><p class="text-xs font-bold tracking-[.14em] text-teal">VITALIS MEMBER</p><h3 class="text-xl font-extrabold font-display mt-1">'+communityEscape(profile.display_name)+'</h3><p class="text-sm text-teal font-semibold">@'+communityEscape(profile.username)+'</p><p class="text-sm text-slate-600 mt-2 whitespace-pre-line">'+communityEscape(profile.bio||'')+'</p></div><button type="button" class="text-slate-400 hover:text-slate-700" onclick="document.getElementById(\'communityViewedProfile\').classList.add(\'hidden\')" aria-label="Close profile">✕</button></div><div class="mt-5"><p class="text-xs font-bold tracking-[.14em] text-teal mb-3">PHOTO GRID</p><div id="communityViewedGallery" class="communityPhotoGrid"></div></div>';
+  const followed=communityFollowedIds.has(profile.user_id);
+  panel.innerHTML='<div class="flex items-start gap-3"><div class="communityMemberAvatar !w-16 !h-16 text-xl">'+(avatar?'<img src="'+communityEscape(avatar)+'" alt="'+communityEscape(profile.display_name)+'">':communityInitial(profile.display_name))+'</div><div class="flex-1 min-w-0"><p class="text-xs font-bold tracking-[.14em] text-teal">VITALIS MEMBER</p><h3 class="text-xl font-extrabold font-display mt-1">'+communityEscape(profile.display_name)+'</h3><p class="text-sm text-teal font-semibold">@'+communityEscape(profile.username)+'</p><p class="text-sm text-slate-600 mt-2 whitespace-pre-line">'+communityEscape(profile.bio||'')+'</p><div class="communityMemberActions mt-3"><button type="button" class="communityFollowButton'+(followed?' following':'')+'" data-community-profile-follow="'+communityEscape(profile.user_id)+'">'+(followed?'Following':'Follow')+'</button><button type="button" class="communityMessagePersonButton" data-community-profile-message="'+communityEscape(profile.user_id)+'">Message</button></div></div><button type="button" class="text-slate-400 hover:text-slate-700" onclick="document.getElementById(\'communityViewedProfile\').classList.add(\'hidden\')" aria-label="Close profile">✕</button></div><div class="mt-5"><p class="text-xs font-bold tracking-[.14em] text-teal mb-3">PHOTO GRID</p><div id="communityViewedGallery" class="communityPhotoGrid"></div></div>';
+  panel.onclick=event=>{const follow=event.target.closest('[data-community-profile-follow]'),message=event.target.closest('[data-community-profile-message]');if(follow)toggleCommunityFollow(follow.dataset.communityProfileFollow,follow);else if(message)messageCommunityPerson(message.dataset.communityProfileMessage);};
   await renderCommunityGallery('communityViewedGallery',photos||[],false);
  }catch(error){console.error('VITALIS community profile open failed:',error);panel.innerHTML='<p class="text-sm text-rose-700">'+communityEscape(communityErrorMessage(error))+'</p>';}
+}
+async function loadCommunityFollowState(){
+ if(!currentUserId||!supabaseClient)return;
+ try{const {data,error}=await supabaseClient.from('community_follows').select('following_id').eq('follower_id',currentUserId).limit(500);if(error)throw error;communityFollowedIds=new Set((data||[]).map(item=>item.following_id));}
+ catch(error){console.error('VITALIS follows load failed:',error);}
+}
+async function toggleCommunityFollow(userId,button){
+ if(!isCommunityAdult()||!userId||userId===currentUserId)return;
+ if(button)button.disabled=true;
+ const following=communityFollowedIds.has(userId);
+ try{
+  const result=following?await supabaseClient.from('community_follows').delete().eq('follower_id',currentUserId).eq('following_id',userId):await supabaseClient.from('community_follows').insert({follower_id:currentUserId,following_id:userId});
+  if(result.error)throw result.error;
+  if(following)communityFollowedIds.delete(userId);else communityFollowedIds.add(userId);
+  document.querySelectorAll('[data-community-follow],[data-community-profile-follow]').forEach(el=>{const id=el.dataset.communityFollow||el.dataset.communityProfileFollow;if(id!==userId)return;const nowFollowing=communityFollowedIds.has(userId);el.textContent=nowFollowing?'Following':'Follow';el.classList.toggle('following',nowFollowing);});
+  showToast(following?'You unfollowed this member.':'You are now following this member.');
+ }catch(error){console.error('VITALIS follow update failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
+ finally{if(button)button.disabled=false;}
+}
+async function messageCommunityPerson(userId){
+ if(!isCommunityAdult()||!userId||userId===currentUserId)return;
+ try{
+  let profile=communityDirectProfiles[userId];
+  if(!profile){const {data,error}=await supabaseClient.from('community_profiles').select('user_id,username,display_name,avatar_path').eq('user_id',userId).eq('is_public',true).maybeSingle();if(error)throw error;if(!data)throw new Error('This searchable profile is no longer available.');profile=data;communityDirectProfiles[userId]=profile;}
+  openCommunityTab('messages',true);
+  await loadCommunityDirectInbox();
+  const existing=communityDirectConversations.find(item=>(item.requester_id===userId&&item.recipient_id===currentUserId)||(item.recipient_id===userId&&item.requester_id===currentUserId));
+  if(existing){await openCommunityConversation(existing);return;}
+  activeDirectConversationId=null;activeDirectRecipient=profile;renderCommunityDirectDraft(profile);
+ }catch(error){console.error('VITALIS direct message open failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
+}
+function renderCommunityDirectDraft(profile){
+ const panel=document.getElementById('communityDirectThread');if(!panel)return;panel.classList.remove('hidden');
+ document.getElementById('communityDirectTitle').textContent=profile.display_name||'Vitalis member';
+ document.getElementById('communityDirectMeta').textContent='Your first message will be sent as a request to @'+(profile.username||'member')+'. They can accept or decline it.';
+ document.getElementById('communityDirectRequestActions').classList.add('hidden');
+ document.getElementById('communityDirectMessageForm').classList.remove('hidden');
+ document.getElementById('communityDirectMessageInput').disabled=false;
+ document.getElementById('communityDirectMessageInput').value='';
+ document.getElementById('communityDirectMessageInput').placeholder='Write a kind first message…';
+ document.getElementById('communityDirectMessageList').innerHTML='<div class="communityChatEmpty"><span class="communityEmptyIcon"><i data-lucide="mail-heart" class="h-6 w-6"></i></span><p class="mt-3 font-bold">Start with a message request</p><p class="mt-1 text-xs text-slate-500">The other person chooses whether to open the conversation.</p></div>';
+ lucide.createIcons();panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function toggleCommunityCreate(open){const form=document.getElementById('communityCreateForm');if(!form)return;form.classList.toggle('hidden',!open);if(open){form.scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('communityCreateName')?.focus();}}
 function communityActivityIcon(activity){const value=String(activity||'').toLowerCase();if(value.includes('run'))return'footprints';if(value.includes('cycl'))return'bike';if(value.includes('yoga'))return'flower-2';if(value.includes('strength'))return'dumbbell';if(value.includes('dance'))return'music-2';return'activity';}
@@ -1273,7 +1318,7 @@ async function reportCommunityMessage(messageId){
 }
 async function blockCommunityMember(userId){
  if(!userId||userId===currentUserId||!window.confirm('Block this member? Their messages will be hidden from you.'))return;
- try{const {error}=await supabaseClient.from('community_blocks').insert({blocker_id:currentUserId,blocked_id:userId});if(error&&error.code!=='23505')throw error;await loadCommunityMessages(activeCommunityId);showToast('Member blocked.');}
+ try{const {error}=await supabaseClient.from('community_blocks').insert({blocker_id:currentUserId,blocked_id:userId});if(error&&error.code!=='23505')throw error;if(activeCommunityId)await loadCommunityMessages(activeCommunityId);if(activeDirectConversationId){closeCommunityDirectThread();await loadCommunityDirectInbox();}showToast('Member blocked.');}
  catch(error){console.error('VITALIS member block failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
 }
 async function loadCommunityFeed(){
@@ -1285,11 +1330,69 @@ async function loadCommunityFeed(){
   list.innerHTML=data.map(message=>'<article class="communityFeedCard"><div class="flex items-center gap-3"><span class="communityThreadIcon"><i data-lucide="'+communityActivityIcon(message.community?.activity_type)+'" class="h-5 w-5"></i></span><div class="min-w-0 flex-1"><p class="truncate text-sm font-extrabold">'+communityEscape(message.community?.name||'Your community')+'</p><p class="mt-0.5 text-xs text-slate-500">'+communityEscape(message.author?.display_name||'Vitalis member')+' · '+communityEscape(new Date(message.created_at).toLocaleDateString())+'</p></div><button class="text-xs font-bold text-teal" onclick="openCommunityTab(\'groups\');openCommunityRoom(\''+communityEscape(message.community_id)+'\')">Open</button></div><p class="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed">'+communityEscape(message.body)+'</p></article>').join('');lucide.createIcons();
  }catch(error){console.error('VITALIS community feed failed:',error);status.textContent=communityErrorMessage(error);}
 }
+async function loadCommunityDirectInbox(){
+ const status=document.getElementById('communityDirectStatus'),list=document.getElementById('communityDirectList');if(!status||!list||!supabaseClient||!currentUserId)return;
+ try{
+  const {data,error}=await supabaseClient.from('community_conversations').select('id,requester_id,recipient_id,status,created_at,updated_at').in('status',['pending','accepted']).order('updated_at',{ascending:false}).limit(60);if(error)throw error;
+  communityDirectConversations=data||[];
+  const partnerIds=[...new Set(communityDirectConversations.map(item=>item.requester_id===currentUserId?item.recipient_id:item.requester_id))];
+  if(partnerIds.length){const {data:profiles,error:profileError}=await supabaseClient.from('community_profiles').select('user_id,username,display_name,avatar_path').in('user_id',partnerIds);if(profileError)throw profileError;communityDirectProfiles=Object.fromEntries((profiles||[]).map(profile=>[profile.user_id,profile]));}
+  else communityDirectProfiles={};
+  if(!communityDirectConversations.length){status.textContent='No direct messages yet. Search for a person and choose Message to start a request.';list.innerHTML='';return;}
+  status.textContent=communityDirectConversations.filter(item=>item.status==='pending'&&item.recipient_id===currentUserId).length+' message request'+(communityDirectConversations.filter(item=>item.status==='pending'&&item.recipient_id===currentUserId).length===1?'':'s')+' · '+communityDirectConversations.length+' conversation'+(communityDirectConversations.length===1?'':'s');
+  list.innerHTML=communityDirectConversations.map(item=>{const otherId=item.requester_id===currentUserId?item.recipient_id:item.requester_id,profile=communityDirectProfiles[otherId],incoming=item.status==='pending'&&item.recipient_id===currentUserId,label=item.status==='accepted'?'Conversation':incoming?'Message request':'Request sent';return '<button type="button" class="communityDirectCard" data-direct-conversation="'+communityEscape(item.id)+'"><span class="communityDirectAvatar">'+communityInitial(profile?.display_name||profile?.username)+'</span><span class="min-w-0 flex-1"><span class="block truncate text-sm font-extrabold">'+communityEscape(profile?.display_name||'Vitalis member')+'</span><span class="block truncate text-xs text-slate-500">'+(profile?.username?'@'+communityEscape(profile.username)+' · ':'')+communityEscape(label)+'</span></span><span class="communityDirectBadge '+(incoming?'request':'')+'">'+(incoming?'Review':item.status==='accepted'?'Open':'Sent')+'</span></button>';}).join('');
+  list.onclick=event=>{const button=event.target.closest('[data-direct-conversation]');if(!button)return;const conversation=communityDirectConversations.find(item=>item.id===button.dataset.directConversation);if(conversation)openCommunityConversation(conversation);};
+ }catch(error){console.error('VITALIS direct inbox failed:',error);status.textContent=communityErrorMessage(error);}
+}
+async function openCommunityConversation(conversation){
+ if(!conversation||!isCommunityAdult())return;
+ activeDirectConversationId=conversation.id;activeDirectRecipient=null;
+ const otherId=conversation.requester_id===currentUserId?conversation.recipient_id:conversation.requester_id,profile=communityDirectProfiles[otherId]||{};
+ const panel=document.getElementById('communityDirectThread');panel.classList.remove('hidden');
+ document.getElementById('communityDirectTitle').textContent=profile.display_name||'Vitalis member';
+ const incoming=conversation.status==='pending'&&conversation.recipient_id===currentUserId;
+ document.getElementById('communityDirectMeta').textContent=conversation.status==='accepted'?'Private conversation'+(profile.username?' with @'+profile.username:'')+'.':incoming?'Message request from @'+(profile.username||'Vitalis member')+'. Accept to reply, or decline it.':'Your message request to @'+(profile.username||'Vitalis member')+' is waiting for a response.';
+ document.getElementById('communityDirectRequestActions').classList.toggle('hidden',!incoming);
+ const form=document.getElementById('communityDirectMessageForm');form.classList.toggle('hidden',conversation.status!=='accepted');
+ document.getElementById('communityDirectMessageInput').disabled=conversation.status!=='accepted';
+ if(conversation.status!=='accepted')document.getElementById('communityDirectMessageInput').value='';
+ document.getElementById('communityDirectMessageInput').placeholder='Write a private message…';
+ await loadCommunityDirectMessages(conversation.id);panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function loadCommunityDirectMessages(conversationId){
+ const list=document.getElementById('communityDirectMessageList');list.innerHTML='<p class="m-auto text-sm text-slate-500">Loading private conversation…</p>';
+ try{
+  const {data,error}=await supabaseClient.from('community_direct_messages').select('id,conversation_id,sender_id,body,created_at,sender:community_profiles(username,display_name)').eq('conversation_id',conversationId).order('created_at',{ascending:true}).limit(100);if(error)throw error;
+  if(activeDirectConversationId!==conversationId)return;
+  if(!data?.length){list.innerHTML='<div class="communityChatEmpty"><p class="font-bold">No messages here yet.</p></div>';return;}
+  list.innerHTML=data.map(message=>{const own=message.sender_id===currentUserId,time=new Date(message.created_at).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});return '<article class="communityMessage'+(own?' own':'')+'"><div class="flex items-center justify-between gap-3"><span class="text-xs font-extrabold">'+(own?'You':communityEscape(message.sender?.display_name||'Vitalis member'))+'</span><time class="text-[10px] text-slate-400">'+communityEscape(time)+'</time></div><p class="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">'+communityEscape(message.body)+'</p>'+(own?'':'<div class="communityMessageActions"><button type="button" onclick="reportCommunityDirectMessage(\''+communityEscape(message.id)+'\')">Report</button><button type="button" onclick="blockCommunityMember(\''+communityEscape(message.sender_id)+'\')">Block member</button></div>')+'</article>';}).join('');list.scrollTop=list.scrollHeight;
+ }catch(error){console.error('VITALIS private messages failed:',error);list.innerHTML='<p class="m-auto text-sm text-rose-700">'+communityEscape(communityErrorMessage(error))+'</p>';}
+}
+async function sendCommunityDirectMessage(event){
+ event?.preventDefault();const field=document.getElementById('communityDirectMessageInput'),body=field.value.trim();if(!body||!isCommunityAdult())return;
+ const button=document.querySelector('#communityDirectMessageForm button[type="submit"]');button.disabled=true;
+ try{
+  if(activeDirectRecipient&&!activeDirectConversationId){const {data,error}=await supabaseClient.rpc('start_community_conversation',{target_user_id_input:activeDirectRecipient.user_id,initial_message_input:body});if(error)throw error;activeDirectConversationId=data;activeDirectRecipient=null;field.value='';await loadCommunityDirectInbox();const conversation=communityDirectConversations.find(item=>item.id===activeDirectConversationId);if(conversation)await openCommunityConversation(conversation);else{const {data:again,error:againError}=await supabaseClient.from('community_conversations').select('id,requester_id,recipient_id,status,created_at,updated_at').eq('id',activeDirectConversationId).single();if(againError)throw againError;await loadCommunityDirectInbox();await openCommunityConversation(again);}}
+  else if(activeDirectConversationId){const {error}=await supabaseClient.from('community_direct_messages').insert({conversation_id:activeDirectConversationId,sender_id:currentUserId,body});if(error)throw error;field.value='';const conversation=communityDirectConversations.find(item=>item.id===activeDirectConversationId);if(conversation)conversation.updated_at=new Date().toISOString();await loadCommunityDirectMessages(activeDirectConversationId);await loadCommunityDirectInbox();}
+ }catch(error){console.error('VITALIS direct message send failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
+ finally{button.disabled=false;}
+}
+async function respondToCommunityMessageRequest(accept){
+ if(!activeDirectConversationId)return;
+ try{const {error}=await supabaseClient.rpc('respond_to_community_message_request',{conversation_id_input:activeDirectConversationId,accept_input:accept});if(error)throw error;await loadCommunityDirectInbox();const conversation=communityDirectConversations.find(item=>item.id===activeDirectConversationId);if(conversation&&accept)await openCommunityConversation(conversation);else{closeCommunityDirectThread();showToast(accept?'Message request accepted.':'Message request declined.');}}
+ catch(error){console.error('VITALIS message request response failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
+}
+async function reportCommunityDirectMessage(messageId){
+ if(!window.confirm('Report this private message for safety review?'))return;
+ try{const {error}=await supabaseClient.from('community_reports').insert({reporter_id:currentUserId,target_type:'direct_message',target_id:messageId,reason:'community_guidelines'});if(error)throw error;showToast('Report sent for safety review.');}
+ catch(error){console.error('VITALIS direct message report failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
+}
+function closeCommunityDirectThread(){activeDirectConversationId=null;activeDirectRecipient=null;document.getElementById('communityDirectMessageInput').value='';document.getElementById('communityDirectThread')?.classList.add('hidden');}
 async function loadCommunityThreads(){
  const status=document.getElementById('communityThreadsStatus'),list=document.getElementById('communityThreadsList');if(!status||!list)return;
  try{
   const active=communityMemberships.filter(item=>item.status==='active');const groups=active.map(item=>({membership:item,group:communityGroups.find(group=>group.id===item.community_id)})).filter(item=>item.group);
-  if(!groups.length){status.textContent='Join a community to start a group conversation. Private one-to-one messages are not enabled in this beta.';list.innerHTML='';return;}
+  if(!groups.length){status.textContent='Join a community to start a group conversation.';list.innerHTML='';return;}
   status.textContent='Your conversations are group spaces with their members.';
   list.innerHTML=groups.map(({group,membership})=>'<button type="button" class="communityThreadCard" onclick="openCommunityTab(\'groups\');openCommunityRoom(\''+communityEscape(group.id)+'\')"><span class="communityThreadIcon"><i data-lucide="'+communityActivityIcon(group.activity_type)+'" class="h-5 w-5"></i></span><span class="min-w-0 flex-1"><span class="block truncate text-sm font-extrabold">'+communityEscape(group.name)+'</span><span class="mt-1 block truncate text-xs text-slate-500">'+communityEscape(group.activity_type)+' · '+(membership.role==='owner'?'You host this group':'Member conversation')+'</span></span><i data-lucide="chevron-right" class="h-4 w-4 text-slate-400"></i></button>').join('');lucide.createIcons();
  }catch(error){console.error('VITALIS community inbox failed:',error);status.textContent=communityErrorMessage(error);}
@@ -1310,6 +1413,7 @@ function openCommunityTab(tab,shouldScroll=false){
   panel.hidden=!active;
   panel.classList.toggle('active',active);
  });
+ if(tab==='messages')loadCommunityDirectInbox();
  if(shouldScroll)document.querySelector('.communityTabs')?.scrollIntoView({behavior:'smooth',block:'start'});
  lucide.createIcons();
 }

@@ -685,3 +685,301 @@ create policy "Community moderators can review reports"
   );
 
 grant select, insert on public.community_reports to authenticated;
+
+-- Follows and person-to-person message requests for the adult community beta.
+create table if not exists public.community_follows (
+  follower_id uuid not null references public.community_profiles(user_id) on delete cascade,
+  following_id uuid not null references public.community_profiles(user_id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (follower_id, following_id),
+  check (follower_id <> following_id)
+);
+
+create index if not exists community_follows_following_idx
+  on public.community_follows (following_id, created_at desc);
+
+alter table public.community_follows enable row level security;
+
+drop policy if exists "Adults can view their own follows" on public.community_follows;
+create policy "Adults can view their own follows"
+  on public.community_follows for select to authenticated
+  using (public.is_community_adult() and follower_id = (select auth.uid()));
+
+grant execute on function public.is_community_adult_for(uuid) to authenticated;
+
+drop policy if exists "Adults can follow searchable members" on public.community_follows;
+create policy "Adults can follow searchable members"
+  on public.community_follows for insert to authenticated
+  with check (
+    public.is_community_adult()
+    and follower_id = (select auth.uid())
+    and public.is_community_adult_for(following_id)
+    and exists (select 1 from public.community_profiles p where p.user_id = following_id and p.is_public)
+    and not exists (
+      select 1 from public.community_blocks b
+      where (b.blocker_id = follower_id and b.blocked_id = following_id)
+         or (b.blocked_id = follower_id and b.blocker_id = following_id)
+    )
+  );
+
+drop policy if exists "Adults can unfollow members" on public.community_follows;
+create policy "Adults can unfollow members"
+  on public.community_follows for delete to authenticated
+  using (public.is_community_adult() and follower_id = (select auth.uid()));
+
+grant select, insert, delete on public.community_follows to authenticated;
+
+create table if not exists public.community_conversations (
+  id uuid primary key default gen_random_uuid(),
+  requester_id uuid not null references public.community_profiles(user_id) on delete cascade,
+  recipient_id uuid not null references public.community_profiles(user_id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'declined')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (requester_id <> recipient_id)
+);
+
+create unique index if not exists community_conversations_pair_unique
+  on public.community_conversations (least(requester_id, recipient_id), greatest(requester_id, recipient_id));
+create index if not exists community_conversations_requester_idx
+  on public.community_conversations (requester_id, updated_at desc);
+create index if not exists community_conversations_recipient_idx
+  on public.community_conversations (recipient_id, updated_at desc);
+
+create table if not exists public.community_direct_messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.community_conversations(id) on delete cascade,
+  sender_id uuid not null references public.community_profiles(user_id) on delete cascade,
+  body text not null check (char_length(trim(body)) between 1 and 1200),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists community_direct_messages_conversation_idx
+  on public.community_direct_messages (conversation_id, created_at asc);
+
+create or replace function public.touch_community_conversation_after_message()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.community_conversations
+    set updated_at = greatest(now(), updated_at + interval '1 microsecond')
+    where id = new.conversation_id;
+  return new;
+end;
+$$;
+
+revoke all on function public.touch_community_conversation_after_message() from public;
+
+drop trigger if exists community_direct_message_touch_conversation on public.community_direct_messages;
+create trigger community_direct_message_touch_conversation
+  after insert on public.community_direct_messages
+  for each row execute function public.touch_community_conversation_after_message();
+
+create or replace function public.is_community_conversation_participant(conversation_id_input uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from public.community_conversations c
+    where c.id = conversation_id_input
+      and (c.requester_id = (select auth.uid()) or c.recipient_id = (select auth.uid()))
+  );
+$$;
+
+revoke all on function public.is_community_conversation_participant(uuid) from public;
+grant execute on function public.is_community_conversation_participant(uuid) to authenticated;
+
+alter table public.community_conversations enable row level security;
+alter table public.community_direct_messages enable row level security;
+
+drop policy if exists "Adults can view their direct conversations" on public.community_conversations;
+create policy "Adults can view their direct conversations"
+  on public.community_conversations for select to authenticated
+  using (
+    public.is_community_adult()
+    and public.is_community_conversation_participant(id)
+    and not exists (
+      select 1 from public.community_blocks b
+      where (b.blocker_id = requester_id and b.blocked_id = recipient_id)
+         or (b.blocked_id = requester_id and b.blocker_id = recipient_id)
+    )
+  );
+
+drop policy if exists "Participants can read request and accepted messages" on public.community_direct_messages;
+create policy "Participants can read request and accepted messages"
+  on public.community_direct_messages for select to authenticated
+  using (
+    public.is_community_adult()
+    and public.is_community_conversation_participant(conversation_id)
+    and exists (
+      select 1 from public.community_conversations c
+      where c.id = conversation_id
+        and c.status in ('pending', 'accepted')
+        and not exists (
+          select 1 from public.community_blocks b
+          where (b.blocker_id = c.requester_id and b.blocked_id = c.recipient_id)
+             or (b.blocked_id = c.requester_id and b.blocker_id = c.recipient_id)
+        )
+    )
+  );
+
+drop policy if exists "Participants can send after a request is accepted" on public.community_direct_messages;
+create policy "Participants can send after a request is accepted"
+  on public.community_direct_messages for insert to authenticated
+  with check (
+    public.is_community_adult()
+    and sender_id = (select auth.uid())
+    and exists (
+      select 1 from public.community_conversations c
+      where c.id = conversation_id
+        and c.status = 'accepted'
+        and (c.requester_id = (select auth.uid()) or c.recipient_id = (select auth.uid()))
+        and not exists (
+          select 1 from public.community_blocks b
+          where (b.blocker_id = c.requester_id and b.blocked_id = c.recipient_id)
+             or (b.blocked_id = c.requester_id and b.blocker_id = c.recipient_id)
+        )
+    )
+  );
+
+grant select on public.community_conversations to authenticated;
+grant select, insert on public.community_direct_messages to authenticated;
+
+-- A new contact sends one request message. The recipient must accept before a chat opens.
+create or replace function public.start_community_conversation(
+  target_user_id_input uuid,
+  initial_message_input text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  sender_id uuid := (select auth.uid());
+  conversation_row public.community_conversations%rowtype;
+  body_text text := trim(initial_message_input);
+begin
+  if sender_id is null or not public.is_community_adult() then
+    raise exception 'Communities are available to adult members only.' using errcode = '42501';
+  end if;
+  if target_user_id_input is null or target_user_id_input = sender_id then
+    raise exception 'Choose another Vitalis member to message.' using errcode = '22023';
+  end if;
+  if body_text is null or char_length(body_text) < 1 or char_length(body_text) > 1200 then
+    raise exception 'A first message must be between 1 and 1200 characters.' using errcode = '22023';
+  end if;
+  if not public.is_community_adult_for(target_user_id_input) or not exists (
+    select 1 from public.community_profiles p where p.user_id = target_user_id_input and p.is_public
+  ) then
+    raise exception 'This Vitalis member is not available for messaging.' using errcode = '42501';
+  end if;
+  if exists (
+    select 1 from public.community_blocks b
+    where (b.blocker_id = sender_id and b.blocked_id = target_user_id_input)
+       or (b.blocked_id = sender_id and b.blocker_id = target_user_id_input)
+  ) then
+    raise exception 'This Vitalis member is not available for messaging.' using errcode = '42501';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended(least(sender_id::text, target_user_id_input::text) || ':' || greatest(sender_id::text, target_user_id_input::text), 0));
+  select * into conversation_row from public.community_conversations c
+    where (c.requester_id = sender_id and c.recipient_id = target_user_id_input)
+       or (c.requester_id = target_user_id_input and c.recipient_id = sender_id)
+    for update;
+
+  if found then
+    if conversation_row.status = 'declined' then
+      raise exception 'This message request was declined.' using errcode = '42501';
+    elsif conversation_row.status = 'pending' then
+      if conversation_row.requester_id = sender_id then
+        raise exception 'Your message request is waiting for a response.' using errcode = 'P0001';
+      end if;
+      return conversation_row.id;
+    end if;
+    insert into public.community_direct_messages (conversation_id, sender_id, body)
+      values (conversation_row.id, sender_id, body_text);
+    return conversation_row.id;
+  end if;
+
+  if (select count(*) from public.community_conversations c
+      where c.requester_id = sender_id and c.status = 'pending'
+        and c.created_at > now() - interval '1 day') >= 10 then
+    raise exception 'You have reached the daily limit for new message requests.' using errcode = '54000';
+  end if;
+
+  insert into public.community_conversations (requester_id, recipient_id)
+    values (sender_id, target_user_id_input)
+    returning * into conversation_row;
+  insert into public.community_direct_messages (conversation_id, sender_id, body)
+    values (conversation_row.id, sender_id, body_text);
+  return conversation_row.id;
+end;
+$$;
+
+create or replace function public.respond_to_community_message_request(
+  conversation_id_input uuid,
+  accept_input boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_community_adult() then
+    raise exception 'Communities are available to adult members only.' using errcode = '42501';
+  end if;
+  update public.community_conversations
+    set status = case when accept_input then 'accepted' else 'declined' end,
+        updated_at = now()
+    where id = conversation_id_input
+      and recipient_id = (select auth.uid())
+      and status = 'pending'
+      and not exists (
+        select 1 from public.community_blocks b
+        where (b.blocker_id = requester_id and b.blocked_id = recipient_id)
+           or (b.blocked_id = requester_id and b.blocker_id = recipient_id)
+      );
+  if not found then
+    raise exception 'This message request is no longer available.' using errcode = 'P0002';
+  end if;
+end;
+$$;
+
+revoke all on function public.start_community_conversation(uuid, text) from public;
+revoke all on function public.respond_to_community_message_request(uuid, boolean) from public;
+grant execute on function public.start_community_conversation(uuid, text) to authenticated;
+grant execute on function public.respond_to_community_message_request(uuid, boolean) to authenticated;
+
+alter table public.community_reports drop constraint if exists community_reports_target_type_check;
+alter table public.community_reports
+  add constraint community_reports_target_type_check check (target_type in ('community', 'message', 'direct_message'));
+
+drop policy if exists "Adults can report community content" on public.community_reports;
+create policy "Adults can report community content"
+  on public.community_reports for insert to authenticated
+  with check (
+    public.is_community_adult()
+    and reporter_id = (select auth.uid())
+    and (
+      (target_type = 'message' and exists (
+        select 1 from public.community_messages m
+        join public.community_members cm on cm.community_id = m.community_id
+        where m.id = target_id and cm.user_id = (select auth.uid()) and cm.status = 'active'
+      ))
+      or (target_type = 'community' and exists (
+        select 1 from public.communities c where c.id = target_id
+      ))
+      or (target_type = 'direct_message' and exists (
+        select 1 from public.community_direct_messages dm
+        where dm.id = target_id and public.is_community_conversation_participant(dm.conversation_id)
+      ))
+    )
+  );
