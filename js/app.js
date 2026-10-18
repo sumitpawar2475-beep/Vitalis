@@ -390,8 +390,8 @@ function renderStreakCalendar(){
  document.getElementById('dashStreakChip').textContent=current+'-day gentle streak';
  let best=0,run=0;
  const known=Object.keys(state.dailyRecords||{}).concat(Object.keys(state.streakMap||{}),[today]).sort();
- const first=known[0]||today;
- for(let ds=first;ds<=today;ds=shiftDateKey(ds,1)){if(getStreakDayData(ds).status==='complete'){run++;best=Math.max(best,run);}else run=0;}
+ const firstKnownDate=known[0]||today;
+ for(let ds=firstKnownDate;ds<=today;ds=shiftDateKey(ds,1)){if(getStreakDayData(ds).status==='complete'){run++;best=Math.max(best,run);}else run=0;}
  document.getElementById('streakBest').textContent=Math.max(best,current);
  document.getElementById('streakMonthPct').textContent=(monthTotal?Math.round(monthDone/monthTotal*100):0)+'%';
 }
