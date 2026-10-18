@@ -213,3 +213,78 @@ body.dark-active .communityDirectBadge.request{background:#493124;border-color:#
 body.dark-active .communityRequestDecline{background:#493124;border-color:#70451F;color:#FED7AA}
 body.dark-active .communityMember{background:#0F2036;border-color:#23405E}
 body.dark-active .communityPhotoTile{background:#0F2036;border-color:#23405E}
+
+.communityOwnHeader,.communityViewedHeader{display:flex;align-items:center;gap:19px;min-width:0;padding:4px 0 8px}
+.communityOwnAvatar{width:116px;height:116px;flex:0 0 auto;overflow:hidden;display:grid;place-items:center;border:4px solid #fff;border-radius:50%;background:linear-gradient(145deg,#CCFBF1,#EDE9FE);box-shadow:0 0 0 3px #99F6E4,0 10px 24px rgba(15,118,110,.14);color:#0F766E;font-size:32px;font-weight:900}
+.communityOwnAvatar img{width:100%;height:100%;object-fit:cover}
+.communityOwnIdentity{min-width:0;flex:1}
+.communityEyebrow{color:#0F766E;font-size:10px;font-weight:900;letter-spacing:.14em}
+.communityOwnName{overflow-wrap:anywhere;font-family:var(--font-display,inherit);font-size:23px;font-weight:900;line-height:1.15;color:#0F172A}
+.communityOwnUsername{margin-top:4px;color:#0F766E;font-size:13px;font-weight:750;overflow-wrap:anywhere}
+.communityOwnBio{margin-top:7px;color:#475569;font-size:13px;line-height:1.55;white-space:pre-line;overflow-wrap:anywhere}
+.communityOwnStats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.communityOwnStats article,.communityViewedStats article{display:flex;align-items:center;gap:10px;min-width:0;border:1px solid #CCFBF1;border-radius:16px;background:linear-gradient(120deg,#F0FDFA,#F8FAFC);padding:12px}
+.communityStatIcon{display:grid;width:36px;height:36px;flex:0 0 auto;place-items:center;border-radius:12px;background:#fff;color:#0F766E;box-shadow:0 2px 8px rgba(15,23,42,.05)}
+.communityStatIcon.streak{background:#FFF7ED;color:#EA580C}
+.communityStatValue{font-size:21px;font-weight:900;line-height:1.1;color:#0F766E}
+.communityStatLabel{margin-top:3px;color:#475569;font-size:10px;font-weight:800}
+.communityStatHint{margin-left:auto;color:#64748B;font-size:10px;text-align:right}
+.communityPrivacyHint,.communityMetricNote{margin-top:9px;color:#64748B;font-size:10px;line-height:1.5}
+.communityOwnActions{display:flex;align-items:center;justify-content:flex-end;gap:9px}
+.communityEditProfileButton,.communityAddButton,.communityIconButton,.communityArchiveToggle{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;border:1px solid #CBD5E1;border-radius:999px;background:#fff;padding:8px 14px;color:#334155;font-size:12px;font-weight:800;transition:transform .15s,border-color .15s,background .15s}
+.communityEditProfileButton:hover,.communityIconButton:hover,.communityArchiveToggle:hover{transform:translateY(-1px);border-color:#0F766E;color:#0F766E}
+.communityAddButton{width:44px;height:44px;border:0;background:linear-gradient(135deg,#0F766E,#0D9488 55%,#6D28D9);padding:0;color:#fff;box-shadow:0 7px 16px rgba(15,118,110,.22)}
+.communityAddButton:hover{transform:translateY(-2px) rotate(5deg)}
+.communityCreateWrap{position:relative}
+.communityCreateMenu{position:absolute;z-index:20;right:0;top:calc(100% + 9px);display:grid;min-width:210px;gap:4px;border:1px solid #E2E8F0;border-radius:16px;background:#fff;padding:7px;box-shadow:0 18px 40px rgba(15,23,42,.16)}
+.communityCreateMenu.hidden{display:none}
+.communityCreateMenu button,.communityItemMenuPanel button{display:flex;align-items:center;gap:9px;width:100%;border:0;border-radius:10px;background:transparent;padding:10px;text-align:left;color:#334155;font-size:12px;font-weight:750}
+.communityCreateMenu button:hover,.communityItemMenuPanel button:hover{background:#F0FDFA;color:#0F766E}
+.communityProfileSectionHeading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.communityArchiveToggle{min-height:34px;padding:6px 11px;font-size:11px}
+.communityArchiveToggle.active{background:#F5F3FF;border-color:#DDD6FE;color:#6D28D9}
+.communityProfileEditor{background:#F8FAFC}
+.communityPostComposer{border:1px solid #DDD6FE;border-radius:18px;background:linear-gradient(145deg,#FAF5FF,#F0FDFA);padding:16px}
+.communityPostsEmpty{border:1px dashed #CBD5E1;border-radius:14px;background:#F8FAFC;padding:16px;color:#64748B;text-align:center;font-size:12px}
+.communityOwnPosts{display:grid;gap:12px}
+.communityPostCard{position:relative;border:1px solid #E2E8F0;border-radius:17px;background:linear-gradient(145deg,#fff,#FAFBFF);padding:15px}
+.communityPostCard.archived,.communityPhotoTile.archived img{opacity:.68}
+.communityPostCardHeader{display:flex;align-items:center;gap:9px;min-height:30px}
+.communityPostType{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:850}
+.communityPostType.blog{background:#F5F3FF;color:#6D28D9}
+.communityPostType.achievement{background:#FFF7ED;color:#C2410C}
+.communityPostCard time{color:#64748B;font-size:10px}
+.communityPostTitle{margin-top:11px;color:#0F172A;font-size:15px;font-weight:850;overflow-wrap:anywhere}
+.communityPostBody{margin-top:6px;color:#475569;font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.communityItemMenu{position:absolute;right:6px;top:6px;z-index:12}
+.communityPostCard .communityItemMenu{top:9px;right:9px}
+.communityItemMenu summary{display:grid;width:32px;height:32px;place-items:center;list-style:none;border:1px solid rgba(203,213,225,.75);border-radius:50%;background:rgba(255,255,255,.95);color:#334155;cursor:pointer;box-shadow:0 2px 8px rgba(15,23,42,.12)}
+.communityItemMenu summary::-webkit-details-marker{display:none}
+.communityItemMenu summary:hover{color:#0F766E;border-color:#99F6E4}
+.communityItemMenuPanel{position:absolute;right:0;top:38px;display:grid;width:164px;gap:2px;border:1px solid #E2E8F0;border-radius:14px;background:#fff;padding:6px;box-shadow:0 14px 32px rgba(15,23,42,.2)}
+.communityItemMenu:not([open]) .communityItemMenuPanel{display:none}
+.communityItemMenuPanel button{padding:9px;font-size:11px}
+.communityItemMenuPanel button.danger{color:#BE123C}
+.communityItemMenuPanel button.danger:hover{background:#FFF1F2;color:#BE123C}
+.communityArchivedBadge{display:inline-flex;align-items:center;border-radius:999px;background:#F1F5F9;padding:5px 8px;color:#475569;font-size:9px;font-weight:850}
+.communityPhotoTile>.communityArchivedBadge{position:absolute;left:7px;top:7px}
+.communityViewedAvatar{width:104px;height:104px;font-size:29px}
+.communityViewedStats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:18px}
+.communityViewedStats article{padding:10px;color:#0F766E}
+.communityViewedStats article:nth-child(2){border-color:#FED7AA;background:linear-gradient(120deg,#FFF7ED,#FFFBEB);color:#C2410C}
+.communityViewedStats article div{display:grid}
+.communityViewedStats article b{font-size:19px;font-weight:900;line-height:1.15}
+.communityViewedStats article span{margin-top:3px;color:#475569;font-size:10px;font-weight:750}
+.communityMetricsLocked{display:flex;align-items:center;gap:8px;margin-top:18px;border:1px solid #E2E8F0;border-radius:13px;background:#F8FAFC;padding:11px;color:#64748B;font-size:11px}
+body.dark-active .communityOwnName,body.dark-active .communityPostTitle{color:#F1F5F9}
+body.dark-active .communityOwnBio,body.dark-active .communityStatLabel,body.dark-active .communityPostBody{color:#CBD5E1}
+body.dark-active .communityOwnStats article,body.dark-active .communityViewedStats article{background:linear-gradient(120deg,#0F3A36,#13273E);border-color:#1A5A53}
+body.dark-active .communityStatIcon{background:#13273E;color:#99F6E4}
+body.dark-active .communityPostCard,body.dark-active .communityPostsEmpty,body.dark-active .communityMetricsLocked{background:#0F2036;border-color:#23405E;color:#A9BDD0}
+body.dark-active .communityEditProfileButton,body.dark-active .communityIconButton,body.dark-active .communityArchiveToggle,body.dark-active .communityItemMenu summary,body.dark-active .communityItemMenuPanel,body.dark-active .communityCreateMenu{background:#13273E;border-color:#23405E;color:#DCE7F1}
+body.dark-active .communityItemMenuPanel button,body.dark-active .communityCreateMenu button{color:#DCE7F1}
+body.dark-active .communityItemMenuPanel button:hover,body.dark-active .communityCreateMenu button:hover{background:#0F3A36;color:#99F6E4}
+body.dark-active .communityPostComposer{background:linear-gradient(145deg,#201B3F,#0F3A36);border-color:#4C4382}
+body.dark-active .communityPostType.blog{background:#34265F;color:#DDD6FE}
+body.dark-active .communityPostType.achievement{background:#493124;color:#FED7AA}
+@media(max-width:640px){.communityOwnHeader,.communityViewedHeader{align-items:flex-start;gap:14px}.communityOwnAvatar{width:88px;height:88px;font-size:25px}.communityViewedAvatar{width:78px;height:78px}.communityOwnName{font-size:19px}.communityOwnStats{gap:7px}.communityOwnStats article{gap:7px;padding:9px}.communityStatIcon{width:31px;height:31px}.communityStatValue{font-size:18px}.communityStatHint{font-size:9px}.communityEditProfileButton{min-height:38px;padding:7px 12px}.communityCreateMenu{min-width:195px}.communityViewedStats{gap:7px}.communityPhotoGrid{gap:7px}}
