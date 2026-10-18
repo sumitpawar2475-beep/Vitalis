@@ -147,7 +147,6 @@ create policy "Members can view permitted community media"
       )
     )
   );
-
 drop policy if exists "Users can upload their own community media" on storage.objects;
 create policy "Users can upload their own community media"
   on storage.objects for insert to authenticated
@@ -981,5 +980,229 @@ create policy "Adults can report community content"
         select 1 from public.community_direct_messages dm
         where dm.id = target_id and public.is_community_conversation_participant(dm.conversation_id)
       ))
+    )
+  );
+
+-- Profile stories and achievements are optional, user-authored content.
+alter table public.community_photos add column if not exists archived_at timestamptz;
+
+drop policy if exists "Members can view photos from discoverable profiles" on public.community_photos;
+create policy "Members can view photos from discoverable profiles"
+  on public.community_photos for select to authenticated
+  using (
+    public.is_community_adult()
+    and (
+      (select auth.uid()) = user_id
+      or (archived_at is null and exists (
+        select 1 from public.community_profiles p
+        where p.user_id = community_photos.user_id and p.is_public
+      ))
+    )
+  );
+
+drop policy if exists "Users can update their own community photos" on public.community_photos;
+create policy "Users can update their own community photos"
+  on public.community_photos for update to authenticated
+  using (public.is_community_adult() and (select auth.uid()) = user_id)
+  with check (public.is_community_adult() and (select auth.uid()) = user_id);
+grant update on public.community_photos to authenticated;
+
+create or replace function public.enforce_community_photo_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  should_count boolean := tg_op = 'INSERT';
+begin
+  perform pg_advisory_xact_lock(hashtextextended(new.user_id::text, 0));
+  if tg_op = 'UPDATE' then should_count := old.archived_at is not null and new.archived_at is null; end if;
+  if new.archived_at is null and should_count
+     and (select count(*) from public.community_photos where user_id = new.user_id and archived_at is null) >= 12 then
+    raise exception 'A community profile can contain at most 12 active photos.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists community_photos_limit on public.community_photos;
+create trigger community_photos_limit
+  before insert or update on public.community_photos
+  for each row execute function public.enforce_community_photo_limit();
+
+create table if not exists public.community_posts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.community_profiles(user_id) on delete cascade,
+  post_type text not null check (post_type in ('blog', 'achievement')),
+  title text not null check (char_length(trim(title)) between 2 and 90),
+  body text not null check (char_length(trim(body)) between 2 and 4000),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  archived_at timestamptz
+);
+
+create index if not exists community_posts_user_created_idx
+  on public.community_posts (user_id, created_at desc);
+
+alter table public.community_posts enable row level security;
+
+drop policy if exists "Members can read visible community profile posts" on public.community_posts;
+create policy "Members can read visible community profile posts"
+  on public.community_posts for select to authenticated
+  using (
+    public.is_community_adult()
+    and (
+      (select auth.uid()) = user_id
+      or (archived_at is null and exists (
+        select 1 from public.community_profiles p
+        where p.user_id = community_posts.user_id and p.is_public
+      ))
+    )
+  );
+
+drop policy if exists "Adults can publish their own profile posts" on public.community_posts;
+create policy "Adults can publish their own profile posts"
+  on public.community_posts for insert to authenticated
+  with check (public.is_community_adult() and (select auth.uid()) = user_id);
+
+drop policy if exists "Adults can update their own profile posts" on public.community_posts;
+create policy "Adults can update their own profile posts"
+  on public.community_posts for update to authenticated
+  using (public.is_community_adult() and (select auth.uid()) = user_id)
+  with check (public.is_community_adult() and (select auth.uid()) = user_id);
+
+drop policy if exists "Adults can delete their own profile posts" on public.community_posts;
+create policy "Adults can delete their own profile posts"
+  on public.community_posts for delete to authenticated
+  using (public.is_community_adult() and (select auth.uid()) = user_id);
+
+grant select, insert, update, delete on public.community_posts to authenticated;
+
+-- Interpret one app record for the privacy-preserving consistency summary.
+create or replace function public.community_day_is_complete(state_input jsonb, day_input date)
+returns boolean
+language plpgsql
+stable
+set search_path = public, pg_temp
+as $$
+declare
+  day_key text := day_input::text;
+  record_data jsonb := coalesce(state_input -> 'dailyRecords' -> day_key, '{}'::jsonb);
+  today_key text;
+  water_ml numeric := 0;
+  water_goal numeric := 2300;
+  workout_count numeric := 0;
+  attendance_data jsonb;
+begin
+  today_key := case when coalesce(state_input ->> 'dailyPlanDate', '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+    then state_input ->> 'dailyPlanDate' else current_date::text end;
+
+  if day_key = today_key then
+    if coalesce(state_input #>> '{hydration,consumed}', '') ~ '^[0-9]+([.][0-9]+)?$' then water_ml := (state_input #>> '{hydration,consumed}')::numeric; end if;
+    if coalesce(state_input #>> '{hydration,goal}', '') ~ '^[0-9]+([.][0-9]+)?$' then water_goal := (state_input #>> '{hydration,goal}')::numeric; end if;
+  else
+    if coalesce(record_data ->> 'waterMl', '') ~ '^[0-9]+([.][0-9]+)?$' then water_ml := (record_data ->> 'waterMl')::numeric; end if;
+    if coalesce(record_data ->> 'waterGoal', '') ~ '^[0-9]+([.][0-9]+)?$' then water_goal := (record_data ->> 'waterGoal')::numeric; end if;
+  end if;
+
+  if coalesce(record_data ->> 'workoutCount', '') ~ '^[0-9]+([.][0-9]+)?$' then workout_count := (record_data ->> 'workoutCount')::numeric; end if;
+  if jsonb_typeof(state_input -> 'workoutLogs') = 'array' then
+    select workout_count + count(*) into workout_count
+    from jsonb_array_elements(state_input -> 'workoutLogs') log_row
+    where log_row ->> 'date' = day_key;
+  end if;
+  attendance_data := state_input -> 'workoutAttendance' -> day_key;
+  if jsonb_typeof(attendance_data) = 'object' then
+    select workout_count + count(*) into workout_count
+    from jsonb_each(attendance_data) attendance
+    where attendance.value = 'true'::jsonb;
+  end if;
+
+  if water_ml >= water_goal and workout_count > 0 then return true; end if;
+  if record_data = '{}'::jsonb and state_input #>> array['streakMap', day_key] = 'true' then return true; end if;
+  return false;
+end;
+$$;
+
+create or replace function public.get_community_fitness_metrics(target_user_id_input uuid)
+returns table (fitness_score integer, current_streak integer, best_streak integer)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  owner_state jsonb;
+  today_value date;
+  tracking_start date;
+  period_start date;
+  day_value date;
+  period_days integer := 0;
+  complete_days integer := 0;
+  run_length integer := 0;
+  best_length integer := 0;
+begin
+  if (select auth.uid()) is null or not public.is_community_adult() or target_user_id_input is null then return; end if;
+  if target_user_id_input <> (select auth.uid()) and not (
+    exists (select 1 from public.community_profiles p where p.user_id = target_user_id_input and p.is_public)
+    and exists (select 1 from public.community_follows f where f.follower_id = (select auth.uid()) and f.following_id = target_user_id_input)
+    and exists (select 1 from public.community_follows f where f.follower_id = target_user_id_input and f.following_id = (select auth.uid()))
+  ) then return; end if;
+
+  select s.state into owner_state from public.user_app_state s where s.user_id = target_user_id_input;
+  if owner_state is null then return query select null::integer, 0, 0; return; end if;
+  today_value := case when coalesce(owner_state ->> 'dailyPlanDate', '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+    then (owner_state ->> 'dailyPlanDate')::date else current_date end;
+  tracking_start := case when coalesce(owner_state ->> 'workoutTrackingStartDate', '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+    then (owner_state ->> 'workoutTrackingStartDate')::date else today_value - 30 end;
+  tracking_start := greatest(tracking_start, today_value - 3650);
+  period_start := greatest(tracking_start, today_value - 30);
+  period_days := greatest(0, (today_value - period_start));
+
+  if period_days > 0 then
+    for day_value in select generate_series(period_start, today_value - 1, interval '1 day')::date loop
+      if public.community_day_is_complete(owner_state, day_value) then complete_days := complete_days + 1; end if;
+    end loop;
+  end if;
+
+  for day_value in select generate_series(tracking_start, today_value, interval '1 day')::date loop
+    if day_value >= tracking_start and public.community_day_is_complete(owner_state, day_value) then
+      run_length := run_length + 1;
+      best_length := greatest(best_length, run_length);
+    else
+      run_length := 0;
+    end if;
+  end loop;
+
+  run_length := 0;
+  for day_value in select generate_series(today_value, tracking_start, interval '-1 day')::date loop
+    if public.community_day_is_complete(owner_state, day_value) then run_length := run_length + 1; else exit; end if;
+  end loop;
+  return query select case when period_days > 0 then round(100.0 * complete_days / period_days)::integer else null::integer end, run_length, best_length;
+end;
+$$;
+
+revoke all on function public.community_day_is_complete(jsonb, date) from public;
+revoke all on function public.get_community_fitness_metrics(uuid) from public;
+grant execute on function public.get_community_fitness_metrics(uuid) to authenticated;
+
+-- A public avatar remains visible with a searchable profile; archived gallery files do not.
+drop policy if exists "Members can view permitted community media" on storage.objects;
+create policy "Members can view permitted community media"
+  on storage.objects for select to authenticated
+  using (
+    public.is_community_adult()
+    and bucket_id = 'community-media'
+    and (
+      (storage.foldername(name))[1] = (select auth.uid())::text
+      or exists (
+        select 1 from public.community_profiles p
+        where p.user_id::text = (storage.foldername(name))[1] and p.is_public
+          and (
+            p.avatar_path = name
+            or exists (select 1 from public.community_photos photo where photo.user_id = p.user_id and photo.photo_path = name and photo.archived_at is null)
+          )
+      )
     )
   );
