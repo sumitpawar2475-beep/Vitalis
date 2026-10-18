@@ -81,6 +81,19 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 #app.community-mode .appLayout main{padding-bottom:1.5rem}
 #app.community-mode .view{display:none}
 #app.community-mode #view-communities.active{display:block}
+.communityTabs{position:sticky;top:72px;z-index:20;display:flex;gap:6px;overflow-x:auto;padding:8px;border:1px solid #E2E8F0;border-radius:18px;background:rgba(255,255,255,.94);box-shadow:0 8px 22px rgba(15,23,42,.05);backdrop-filter:blur(14px);scrollbar-width:thin}
+.communityTab{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:1 0 auto;min-height:44px;padding:10px 15px;border:1px solid transparent;border-radius:12px;background:transparent;color:#64748B;font-size:13px;font-weight:700;white-space:nowrap;transition:background-color .18s ease,color .18s ease,border-color .18s ease}
+.communityTab:hover{background:#F0FDFA;color:#0F766E}
+.communityTab.active{background:#0F766E;border-color:#0F766E;color:#fff;box-shadow:0 5px 14px rgba(15,118,110,.18)}
+.communityTab:focus-visible{outline:3px solid rgba(20,184,166,.35);outline-offset:2px}
+.communityTabPanel{min-width:0;scroll-margin-top:130px}
+.communityTabPanel[hidden]{display:none!important}
+.communityComingSoon{min-height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:36px 22px;background:radial-gradient(circle at 50% 0%,#F0FDFA 0,transparent 46%),#fff}
+body.dark-active .communityTabs{background:rgba(19,39,62,.95);border-color:#23405E}
+body.dark-active .communityTab{color:#A9BBD0}
+body.dark-active .communityTab:hover{background:#0F3A36;color:#99F6E4}
+body.dark-active .communityTab.active{background:#0F766E;border-color:#0F766E;color:#fff}
+body.dark-active .communityComingSoon{background:radial-gradient(circle at 50% 0%,#0F3A36 0,transparent 46%),#13273E}
 .communityHero{background:linear-gradient(120deg,#0F766E 0%,#0D9488 48%,#5B55B8 100%);box-shadow:0 22px 55px rgba(15,118,110,.18)}
 .communityFeature,.communityPanel{background:#fff;border:1px solid #E2E8F0;border-radius:20px;padding:18px;box-shadow:0 8px 24px rgba(15,23,42,.035)}
 .communityFeature{transition:transform .2s ease,box-shadow .2s ease}
@@ -94,7 +107,7 @@ body.dark-active .communityFeature,body.dark-active .communityPanel{background:#
 body.dark-active .communityEmpty{background:linear-gradient(145deg,#102239,#0F3A36);border-color:#31516B}
 body.dark-active .communityEmptyIcon{background:#13273E;border-color:#23405E}
 body.dark-active .communitySafety{background:#0F3A36;border-color:#1A5A53;color:#99F6E4}
-@media(max-width:640px){.communityHero{border-radius:22px}.communityPanel{padding:15px}.communityEmpty{min-height:190px}}
+@media(max-width:640px){.communityHero{border-radius:22px}.communityPanel{padding:15px}.communityEmpty{min-height:190px}.communityTabs{top:108px;border-radius:14px;padding:5px}.communityTab{gap:6px;min-height:42px;padding:9px 12px;font-size:12px}.communityComingSoon{min-height:270px;padding:28px 16px}}
 
 
 .communityPhotoGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}

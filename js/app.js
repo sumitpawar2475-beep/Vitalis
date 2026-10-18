@@ -11,7 +11,7 @@ function freshState(user=null){ return {...defaultState,user,hydration:{...defau
 let state=freshState();
 let currentUserId=null, loadingAccountId=null, loadingAccountPromise=null, cloudSaveTimer=null, cloudSaveQueue=Promise.resolve();
 let passwordRecoveryActive=false;
-let communityProfile=null, communityProfileOwnerId=null, communityProfileLoaded=false, communityLoadingUserId=null, communityLoadPromise=null, communitySearchTimer=null, communityOwnPhotos=[];
+let communityProfile=null, communityProfileOwnerId=null, communityProfileLoaded=false, communityLoadingUserId=null, communityLoadPromise=null, communitySearchTimer=null, communityOwnPhotos=[], activeCommunityTab='profile';
 let authMode='signin', currentStep=1, currentMealDay=(new Date().getDay()+6)%7, mealData=[], mealPlanBuiltForWeek=null, mealPlanLastSeenDate=todayStr(), activeMealSwapType=null, mealSwapCandidates=[], chartInstance=null, burnChartInstance=null, timerInterval=null, timerSeconds=1200, timerRunning=false, currentRecipe=null, currentAudio=null, currentTrackIdx=-1, musicProgressInt=null;
 
 let demoProfiles={
@@ -1156,6 +1156,38 @@ async function openCommunityProfile(userId){
   await renderCommunityGallery('communityViewedGallery',photos||[],false);
  }catch(error){console.error('VITALIS community profile open failed:',error);panel.innerHTML='<p class="text-sm text-rose-700">'+communityEscape(communityErrorMessage(error))+'</p>';}
 }
+function openCommunityTab(tab,shouldScroll=false){
+ const tabs=['profile','updates','messages','search','groups'];
+ if(!tabs.includes(tab))return;
+ activeCommunityTab=tab;
+ tabs.forEach(name=>{
+  const button=document.getElementById('communityTab'+name[0].toUpperCase()+name.slice(1));
+  const panel=document.getElementById('communityPanel'+name[0].toUpperCase()+name.slice(1));
+  if(!button||!panel)return;
+  const active=name===tab;
+  button.classList.toggle('active',active);
+  button.setAttribute('aria-selected',String(active));
+  button.tabIndex=active?0:-1;
+  panel.hidden=!active;
+  panel.classList.toggle('active',active);
+ });
+ if(shouldScroll)document.querySelector('.communityTabs')?.scrollIntoView({behavior:'smooth',block:'start'});
+ lucide.createIcons();
+}
+function navigateCommunityTabs(event){
+ const tabs=['profile','updates','messages','search','groups'];
+ const current=tabs.indexOf(activeCommunityTab);
+ let next=current;
+ if(event.key==='ArrowRight')next=(current+1)%tabs.length;
+ else if(event.key==='ArrowLeft')next=(current-1+tabs.length)%tabs.length;
+ else if(event.key==='Home')next=0;
+ else if(event.key==='End')next=tabs.length-1;
+ else return;
+ event.preventDefault();
+ const tab=tabs[next];
+ openCommunityTab(tab);
+ document.getElementById('communityTab'+tab[0].toUpperCase()+tab.slice(1))?.focus();
+}
 function renderAppMode(){
  const isCommunities=state.appMode==='communities';
  document.getElementById('app').classList.toggle('community-mode',isCommunities);
@@ -1165,7 +1197,7 @@ function renderAppMode(){
   button.classList.toggle('bg-white',!active); button.classList.toggle('text-slate-700',!active); button.classList.toggle('border-slate-200',!active);
   button.setAttribute('aria-pressed',String(active));
  });
- if(isCommunities){document.querySelectorAll('.view').forEach(view=>view.classList.remove('active'));document.getElementById('view-communities').classList.add('active');loadCommunityHome();}
+ if(isCommunities){document.querySelectorAll('.view').forEach(view=>view.classList.remove('active'));document.getElementById('view-communities').classList.add('active');openCommunityTab(activeCommunityTab);loadCommunityHome();}
 }
 function setAppMode(mode,doSave=true){
 if(mode==='communities') state.appMode='communities'; else state.appMode='vitalis';
