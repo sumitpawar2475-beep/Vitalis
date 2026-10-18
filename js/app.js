@@ -100,16 +100,23 @@ async function loadAccount(session){
  if(loadingAccountId===user.id&&loadingAccountPromise) return loadingAccountPromise;
  loadingAccountId=user.id;
  loadingAccountPromise=(async()=>{
-  const {data,error}=await supabaseClient.from('user_app_state').select('state').eq('user_id',user.id).maybeSingle();
-  if(error) throw error; if(loadingAccountId!==user.id) return;
-  const saved=data?.state||{};
-  state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null,workoutFeedback:saved.workoutFeedback||{},workoutAttendance:saved.workoutAttendance||{},mealPlanVersion:Number(saved.mealPlanVersion)||0,mealPlanOverrides:saved.mealPlanOverrides||{},workoutTrackingStartDate:saved.workoutTrackingStartDate||null};
-  currentUserId=user.id; loadingAccountId=null; loadingAccountPromise=null;
-  syncDailyPlan();
-  applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
-  if(state.profile) showApp(true); else showProfileSetup();
-  if(state.reminders && state.profile) syncExistingHydrationPush();
-  if(!data) save();
+  const controller=new AbortController();
+  const timeoutId=setTimeout(()=>controller.abort(),15000);
+  try {
+   const {data,error}=await supabaseClient.from('user_app_state').select('state').eq('user_id',user.id).maybeSingle().abortSignal(controller.signal);
+   if(error) throw error; if(loadingAccountId!==user.id) return;
+   const saved=data?.state||{};
+   state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null,workoutFeedback:saved.workoutFeedback||{},workoutAttendance:saved.workoutAttendance||{},mealPlanVersion:Number(saved.mealPlanVersion)||0,mealPlanOverrides:saved.mealPlanOverrides||{},workoutTrackingStartDate:saved.workoutTrackingStartDate||null};
+   currentUserId=user.id;
+   syncDailyPlan();
+   applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
+   if(state.profile) showApp(true); else showProfileSetup();
+   if(state.reminders && state.profile) syncExistingHydrationPush();
+   if(!data) save();
+  } finally {
+   clearTimeout(timeoutId);
+   if(loadingAccountId===user.id){loadingAccountId=null;loadingAccountPromise=null;}
+  }
  })();
  return loadingAccountPromise;
 }
