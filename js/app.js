@@ -653,7 +653,6 @@ if(p.goal==='muscle'&&group!=='kids'&&group!=='seniors'){ ex.forEach(e=>{ if(/pu
 const focus=weeklyWorkoutFocus(group);
 if(!['kids'].includes(group)&&focus!=='Strength A'&&focus!=='Strength B'&&focus!=='Strength + balance'&&focus!=='Sport or active play') ex=movementSession(focus,group);
 else if(group==='teens'&&focus==='Sport or active play') ex=movementSession(focus,group);
-if(p.activity==='sedentary') ex=ex.map(e=>({...e,mins:Math.max(2,Math.round(e.mins*.8)),sets:e.sets.replace(/(\\d+) sets?/,(_,n)=>Math.max(1,Math.floor(Number(n)*.8))+' sets')}));
 if(group==='teens'&&(focus==='Strength A'||focus==='Strength B')) ex=[
  {name:'Easy warm-up walk',icon:'🚶',sets:'1 round',reps:'4 min',mins:4,met:3,desc:'Start easy and increase pace only if it feels comfortable.'},
  {name:'Incline push-ups',icon:'💪',sets:'2 sets',reps:'8-10 reps',mins:4,met:4,desc:'Use a sturdy counter or wall; stop before form breaks.'},
@@ -662,6 +661,7 @@ if(group==='teens'&&(focus==='Strength A'||focus==='Strength B')) ex=[
  {name:'Dead bug',icon:'🧘',sets:'2 sets',reps:'6 each side',mins:4,met:3,desc:'Move slowly and breathe steadily.'},
  {name:'Cool-down stretch',icon:'🌿',sets:'1 round',reps:'4 min',mins:4,met:2,desc:'Gentle stretches only; no bouncing or forcing.'}
  ];
+if(p.activity==='sedentary') ex=ex.map(e=>({...e,mins:Math.max(2,Math.round(e.mins*.8)),sets:e.sets.replace(/(\\d+) sets?/,(_,n)=>Math.max(1,Math.floor(Number(n)*.8))+' sets')}));
 const adaptation=getWorkoutAdaptation();
 if(adaptation.mode==='gentle') ex=movementSession('Recovery',group);
 else if(adaptation.mode==='restart') ex=ex.map(e=>({...e,mins:Math.max(2,Math.round(e.mins*.75)),sets:e.sets.replace(/(\d+) sets?/,(_,n)=>Math.max(1,Math.floor(Number(n)*.75))+' sets')}));
