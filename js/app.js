@@ -6,8 +6,8 @@ const VITALIS_PUSH_PUBLIC_KEY = 'PASTE_PUBLIC_VAPID_KEY_HERE';
 const supabaseClient = window.supabase && !SUPABASE_URL.includes('YOUR_PROJECT_ID') && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
-const defaultState={ user:null, profile:null, ageStyle:'adults', units:'metric', lang:'en', theme:'light', hydration:{ consumed:0, goal:2300, glasses:[false,false,false,false,false,false,false,false], scheduleDone:{} }, reduceMotion:false, reminders:false, servings:2, prepStyle:'standard', workoutLogs:[], streakMap:{}, dailyRecords:{}, dailyPlanDate:null, profilePic:null, profilePicTemp:null };
-function freshState(user=null){ return {...defaultState,user,hydration:{...defaultState.hydration,glasses:[...defaultState.hydration.glasses],scheduleDone:{}},workoutLogs:[],streakMap:{},dailyRecords:{},dailyPlanDate:null}; }
+const defaultState={ user:null, profile:null, ageStyle:'adults', units:'metric', lang:'en', theme:'light', hydration:{ consumed:0, goal:2300, glasses:[false,false,false,false,false,false,false,false], scheduleDone:{} }, reduceMotion:false, reminders:false, servings:2, prepStyle:'standard', workoutLogs:[], streakMap:{}, dailyRecords:{}, dailyPlanDate:null, workoutFeedback:{}, workoutTrackingStartDate:null, profilePic:null, profilePicTemp:null };
+function freshState(user=null){ return {...defaultState,user,hydration:{...defaultState.hydration,glasses:[...defaultState.hydration.glasses],scheduleDone:{}},workoutLogs:[],streakMap:{},dailyRecords:{},dailyPlanDate:null,workoutFeedback:{},workoutTrackingStartDate:null}; }
 let state=freshState();
 let currentUserId=null, loadingAccountId=null, loadingAccountPromise=null, cloudSaveTimer=null, cloudSaveQueue=Promise.resolve();
 let passwordRecoveryActive=false;
@@ -103,7 +103,7 @@ async function loadAccount(session){
   const {data,error}=await supabaseClient.from('user_app_state').select('state').eq('user_id',user.id).maybeSingle();
   if(error) throw error; if(loadingAccountId!==user.id) return;
   const saved=data?.state||{};
-  state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null};
+  state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null,workoutFeedback:saved.workoutFeedback||{},workoutTrackingStartDate:saved.workoutTrackingStartDate||null};
   currentUserId=user.id; loadingAccountId=null; loadingAccountPromise=null;
   syncDailyPlan();
   applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
@@ -117,8 +117,9 @@ async function signOut(){ if(!supabaseClient){showAuthStatus('Connect this websi
 function todayStr(offset=0){ const d=new Date(); d.setDate(d.getDate()+offset); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); }
 function shiftDateKey(dateKey,offset){ const [y,m,d]=dateKey.split('-').map(Number); const value=new Date(y,m-1,d+offset,12); return [value.getFullYear(),String(value.getMonth()+1).padStart(2,'0'),String(value.getDate()).padStart(2,'0')].join('-'); }
 function syncDailyPlan(){
- const today=todayStr(); state.dailyRecords=state.dailyRecords||{}; state.streakMap=state.streakMap||{};
- const previous=state.dailyPlanDate;
+ const today=todayStr(); state.dailyRecords=state.dailyRecords||{}; state.streakMap=state.streakMap||{}; state.workoutFeedback=state.workoutFeedback||{};
+ const previous=state.dailyPlanDate; let changed=false;
+ if(!state.workoutTrackingStartDate){state.workoutTrackingStartDate=today;changed=true;}
  if(previous&&previous<today){
   for(let day=previous;day<today;day=shiftDateKey(day,1)){
    if(!state.dailyRecords[day]){
@@ -129,8 +130,9 @@ function syncDailyPlan(){
    state.streakMap[day]=Number(record.waterMl)>=Number(state.hydration.goal)||Number(record.workoutCount)>0;
   }
   state.hydration={...state.hydration,consumed:0,glasses:Array.from({length:Math.max(1,Math.ceil(state.hydration.goal/250))},()=>false),scheduleDone:{}};
-  state.dailyPlanDate=today; save();
- }else if(previous!==today){ state.dailyPlanDate=today; }
+  state.dailyPlanDate=today; changed=true;
+ }else if(previous!==today){state.dailyPlanDate=today;changed=true;}
+ if(changed) save();
 }
 function getStreakDayData(dateKey){
  const record=state.dailyRecords?.[dateKey]||{};
@@ -546,9 +548,79 @@ function printRecipe(){ window.print(); }
 function addToShoppingFromRecipe(){ generateShoppingList(); closeRecipe(); }
 
 /* WORKOUT */
+function getWorkoutAdaptation(){
+ const today=todayStr(),start=state.workoutTrackingStartDate||today,logs=state.workoutLogs||[];
+ let missedDays=0;
+ const profile=state.profile||demoProfiles.adults;
+ const group=profile.age<=12?'kids':profile.age<=17?'teens':profile.age>=60?'seniors':'adults';
+ for(let offset=1;offset<=14&&missedDays<7;offset++){
+  const date=shiftDateKey(today,-offset);
+  if(date<start) break;
+  if(weeklyWorkoutFocus(group,date)==='Recovery') continue;
+  if(logs.some(log=>log.date===date)) break;
+  missedDays++;
+ }
+ const feedbackDates=Object.keys(state.workoutFeedback||{}).filter(date=>date<today&&date>=shiftDateKey(today,-3)).sort();
+ const lastFeedback=feedbackDates.length?state.workoutFeedback[feedbackDates[feedbackDates.length-1]]:null;
+ let mode='steady';
+ if(missedDays>=3||lastFeedback==='hard') mode='gentle';
+ else if(missedDays>0) mode='restart';
+ else if(lastFeedback==='easy'&&profile.age>=20&&profile.age<60) mode='progress';
+ return {missedDays,lastFeedback,mode};
+}
+function weeklyWorkoutFocus(group,dateKey=todayStr()){
+ const day=new Date(dateKey+'T12:00:00').getDay();
+ const schedules={
+  adults:['Recovery','Strength A','Cardio','Mobility','Strength B','Cardio','Enjoyable movement'],
+  teens:['Recovery','Strength A','Cardio','Mobility','Strength B','Cardio','Sport or active play'],
+  seniors:['Recovery','Strength + balance','Cardio','Balance + mobility','Strength + balance','Cardio','Gentle movement']
+ };
+ return (schedules[group]||[])[day]||'Active play';
+}
+function movementSession(focus,group){
+ if(group==='kids'&&/Mobility|Recovery|Gentle movement/.test(focus)) return [
+  {name:'Easy dance and freeze game',icon:'💃',sets:'2 songs',reps:'Move at your own pace',mins:6,met:3,desc:'Keep it playful and pause whenever you like; adult supervision is recommended.'},
+  {name:'Superhero stretch',icon:'🦸',sets:'1 round',reps:'Gentle stretches',mins:4,met:2,desc:'Reach and breathe gently; never force a stretch.'}
+ ];
+ if(/Cardio/.test(focus)) return [
+  {name:'Easy warm-up walk',icon:'🚶',sets:'1 round',reps:'Easy pace',mins:5,met:3,desc:'Start gently and let breathing settle into a comfortable rhythm.'},
+  {name:'Steady walk or cycle',icon:'🚴',sets:'1 round',reps:'Talkable pace',mins:18,met:4,desc:'Choose a pace where conversation is still possible; slow down whenever needed.'},
+  {name:'Cool-down + gentle stretch',icon:'🧘',sets:'1 round',reps:'Easy flow',mins:5,met:2.5,desc:'Ease the pace, then gently stretch without forcing a range of motion.'}
+ ];
+ if(/Mobility|Recovery|Gentle movement/.test(focus)) return [
+  {name:'Comfortable walk or march',icon:'🚶',sets:'1 round',reps:'Easy pace',mins:6,met:2.8,desc:'Keep the effort light; this is a recovery session, not a catch-up workout.'},
+  {name:'Shoulder and ankle mobility',icon:'🔄',sets:'2 rounds',reps:'6 each side',mins:4,met:2,desc:'Move slowly through a comfortable range; skip anything that causes pain.'},
+  {name:'Gentle stretch and breathing',icon:'🌿',sets:'1 round',reps:'Slow breaths',mins:5,met:2,desc:'Relax your shoulders and breathe comfortably. No bouncing or forced stretches.'}
+ ];
+ if(/Balance/.test(focus)) return [
+  {name:'Supported march in place',icon:'🪑',sets:'2 rounds',reps:'30 sec',mins:4,met:2.8,desc:'Stand near a stable chair or counter and hold support as needed.'},
+  {name:'Chair sit-to-stand',icon:'🪑',sets:'2 sets',reps:'6-8 reps',mins:4,met:3,desc:'Use a sturdy chair and hands for support if needed; move at a controlled pace.'},
+  {name:'Ankle circles + heel raises',icon:'🔄',sets:'2 sets',reps:'8 each',mins:4,met:2.5,desc:'Hold stable support, keep the movements small and comfortable.'},
+  {name:'Slow walk + breathing',icon:'🌿',sets:'1 round',reps:'Easy pace',mins:5,met:2.5,desc:'Finish with a relaxed walk; stop if you feel unsteady or unwell.'}
+ ];
+ if(group==='teens') return [
+  {name:'Choose a sport or active game',icon:'⚽',sets:'1 round',reps:'Enjoyable pace',mins:20,met:5,desc:'Pick an activity you enjoy; keep it social and take breaks when needed.'},
+  {name:'Easy warm-up',icon:'🤸',sets:'1 round',reps:'5 min',mins:5,met:3,desc:'Begin with easy movement before increasing pace.'},
+  {name:'Cool-down walk',icon:'🚶',sets:'1 round',reps:'Easy pace',mins:5,met:2.5,desc:'Gradually slow down and recover.'}
+ ];
+ if(group==='kids') return [
+  {name:'Dance and freeze game',icon:'💃',sets:'3 songs',reps:'Move at your own pace',mins:8,met:4,desc:'Make it playful. Pause whenever you need and keep an adult nearby.'},
+  {name:'Animal walks',icon:'🐻',sets:'2 rounds',reps:'10 easy steps',mins:5,met:3.5,desc:'Choose fun, comfortable movements; no racing or pushing through pain.'},
+  {name:'Superhero stretch',icon:'🦸',sets:'1 round',reps:'Gentle stretches',mins:3,met:2,desc:'Reach and breathe gently with adult supervision.'}
+ ];
+ return [
+  {name:'Easy walk',icon:'🚶',sets:'1 round',reps:'Comfortable pace',mins:10,met:2.8,desc:'A short reset at an easy, talkable pace.'},
+  {name:'Gentle mobility',icon:'🔄',sets:'1 round',reps:'5 min',mins:5,met:2,desc:'Move joints gently in a comfortable range; stop if anything hurts.'},
+  {name:'Relaxed cool-down',icon:'🌿',sets:'1 round',reps:'Slow breathing',mins:3,met:2,desc:'Take a few comfortable breaths and finish without rushing.'}
+ ];
+}
+function saveWorkoutFeedback(value){
+ state.workoutFeedback=state.workoutFeedback||{}; state.workoutFeedback[todayStr()]=value; save(); renderWorkout();
+ showToast('Thanks — your next plan will adapt to that feedback.');
+}
 function getWorkoutPlan(p){
-const bmi=calcBmi(p); const age=p.age;
-let group='adults'; if(age<=12) group='kids'; else if(age<=19) group='teens'; else if(age>=60) group='seniors';
+const age=p.age;
+let group='adults'; if(age<=12) group='kids'; else if(age<=17) group='teens'; else if(age>=60) group='seniors';
 let ex=[];
 if(group==='kids') ex=[
 {name:'Jumping Jacks Fun',icon:'⭐',sets:'2 rounds',reps:'30 sec',mins:4,met:7,desc:'Bouncy warm-up, arms wide like a star.'},
@@ -575,23 +647,52 @@ else ex=[
 {name:'Push-ups / Knee Push-ups',icon:'💪',sets:'3 sets',reps:'10 reps',mins:4,met:5,desc:'Strength for chest & arms.'},
 {name:'Plank + Dead Bug',icon:'🧘',sets:'3 sets',reps:'30 sec',mins:4,met:3.5,desc:'Core stability, back-friendly.'},
 {name:'Surya Namaskar Light',icon:'☀️',sets:'3 rounds',reps:'Slow flow',mins:5,met:4,desc:'Full-body mobility & breath.'}];
-if(bmi>=30){ ex=ex.slice(0,4); ex.push({name:'Low-impact Cool Walk',icon:'🚶',sets:'1 round',reps:'6 min',mins:6,met:3,desc:'Joint-friendly extra — no jumping.'}); }
+
 if(p.goal==='muscle'&&group!=='kids'&&group!=='seniors'){ ex.forEach(e=>{ if(/push|squat|lunge/i.test(e.name)) e.sets='4 sets'; }); }
+if(p.activity==='sedentary') ex=ex.map(e=>({...e,mins:Math.max(2,Math.round(e.mins*.8)),sets:e.sets.replace(/(\d+) sets?/,(_,n)=>Math.max(1,Math.floor(Number(n)*.8))+' sets')}));
+const focus=weeklyWorkoutFocus(group);
+if(!['kids'].includes(group)&&focus!=='Strength A'&&focus!=='Strength B'&&focus!=='Strength + balance'&&focus!=='Sport or active play') ex=movementSession(focus,group);
+else if(group==='teens'&&focus==='Sport or active play') ex=movementSession(focus,group);
+if(group==='teens'&&(focus==='Strength A'||focus==='Strength B')) ex=[
+ {name:'Easy warm-up walk',icon:'🚶',sets:'1 round',reps:'4 min',mins:4,met:3,desc:'Start easy and increase pace only if it feels comfortable.'},
+ {name:'Incline push-ups',icon:'💪',sets:'2 sets',reps:'8-10 reps',mins:4,met:4,desc:'Use a sturdy counter or wall; stop before form breaks.'},
+ {name:'Bodyweight squats',icon:'🦵',sets:'2 sets',reps:'8-10 reps',mins:4,met:4,desc:'Move smoothly within a comfortable range.'},
+ {name:'Glute bridges',icon:'🌉',sets:'2 sets',reps:'10 reps',mins:4,met:3,desc:'Keep the movement controlled; skip if uncomfortable.'},
+ {name:'Dead bug',icon:'🧘',sets:'2 sets',reps:'6 each side',mins:4,met:3,desc:'Move slowly and breathe steadily.'},
+ {name:'Cool-down stretch',icon:'🌿',sets:'1 round',reps:'4 min',mins:4,met:2,desc:'Gentle stretches only; no bouncing or forcing.'}
+ ];
+const adaptation=getWorkoutAdaptation();
+if(adaptation.mode==='gentle') ex=movementSession('Recovery',group);
+else if(adaptation.mode==='restart') ex=ex.map(e=>({...e,mins:Math.max(2,Math.round(e.mins*.75)),sets:e.sets.replace(/(\d+) sets?/,(_,n)=>Math.max(1,Math.floor(Number(n)*.75))+' sets')}));
+else if(adaptation.mode==='progress'&&group==='adults') ex=ex.map((e,i)=>({...e,mins:i===0?e.mins+2:e.mins}));
 let totalCal=Math.round(ex.reduce((s,e)=>s+e.met*p.weight*(e.mins/60),0));
 let totalMin=ex.reduce((s,e)=>s+e.mins,0);
-return {group, exercises:ex, totalCal, totalMin, level: group==='kids'?'Playful • No equipment':group==='seniors'?'Gentle • Chair support':bmi>=30?'Low-impact • Joint-friendly':p.activity==='sedentary'?'Beginner-friendly':'Balanced • Progressive'};
+return {group,focus,adaptation,exercises:ex,totalCal,totalMin,level:group==='kids'?'Playful • No equipment':group==='seniors'?'Gentle • Chair support':p.activity==='sedentary'?'Beginner-friendly':'Balanced • Progressive'};
 }
 function renderWorkoutPreviewChip(){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); const el=document.getElementById('dashWorkoutPreview'); if(el) el.textContent=`${plan.level.split('•')[0]} • ~${plan.totalMin} min • ~${plan.totalCal} kcal`; }
 function renderWorkout(){
 const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p);
-document.getElementById('workoutEyebrow').textContent=`SUGGESTED FOR ${p.name.toUpperCase()} • BMI ${calcBmi(p).toFixed(1)} • ${p.activity.toUpperCase()} • ${p.goal.toUpperCase()}`;
+const coach=document.getElementById('workoutCoachCard');
+if(coach){
+ const miss=plan.adaptation.missedDays;
+ const feedback=state.workoutFeedback?.[todayStr()];
+ const note=plan.adaptation.mode==='gentle'
+  ?'After a tougher session or several missed sessions, today is a short, low-impact reset. No catch-up workouts.'
+  :plan.adaptation.mode==='restart'
+   ?'You missed '+miss+' planned session'+(miss===1?'':'s')+'. Today is scaled down so you can restart comfortably.'
+   :plan.adaptation.mode==='progress'
+    ?'Your recent session felt easy, so today adds a small amount of time. Progress stays gradual.'
+    :'Your recent activity supports the regular plan for today.';
+ coach.innerHTML='<div class="flex flex-col sm:flex-row sm:items-center gap-3"><div class="flex-1"><p class="font-bold text-sm">🧭 Adaptive coach • '+plan.focus+'</p><p class="text-xs text-slate-600 mt-1">'+note+'</p><p class="text-[11px] text-slate-500 mt-1">Built from logged workouts and your effort feedback. Rest days do not count as missed sessions.</p></div><div class="flex flex-wrap gap-2" aria-label="How did your last workout feel?"><button onclick="saveWorkoutFeedback(\'easy\')" class="px-3 py-2 rounded-full border text-xs font-bold '+(feedback==='easy'?'bg-teal text-white border-teal':'bg-white border-slate-200')+'">Too easy</button><button onclick="saveWorkoutFeedback(\'right\')" class="px-3 py-2 rounded-full border text-xs font-bold '+(feedback==='right'?'bg-teal text-white border-teal':'bg-white border-slate-200')+'">About right</button><button onclick="saveWorkoutFeedback(\'hard\')" class="px-3 py-2 rounded-full border text-xs font-bold '+(feedback==='hard'?'bg-teal text-white border-teal':'bg-white border-slate-200')+'">Too hard</button></div></div>';
+}
+document.getElementById('workoutEyebrow').textContent=`SUGGESTED FOR ${p.name.toUpperCase()} • ${p.activity.toUpperCase()} • ${p.goal.toUpperCase()}`;
 const titles={kids:'Playful power • Fun & bouncy 🌈',teens:'Fresh & fierce • HIIT energy ⚡',adults:'Balanced full-body • Gentle & steady 💪',seniors:'Steady & safe • Chair-friendly ☀️'};
-document.getElementById('workoutTitle').textContent=titles[plan.group]||titles.adults;
-document.getElementById('workoutDesc').textContent=`Built from your age (${p.age}y), weight (${Math.round(p.weight)}kg), BMI, activity (${p.activity}), goal (${p.goal}), sleep (${p.sleep}h) & climate (${p.climate}). ${plan.group==='seniors'?'Low-impact, balance-safe, stop if dizzy.':plan.group==='kids'?'20 min play-based movement — adult supervision for under 8.':'No equipment, moderate sweat, general fitness only.'}`;
-document.getElementById('workoutChips').innerHTML=`<span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">⏱ ${plan.totalMin} min</span><span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">🔥 ~${plan.totalCal} kcal</span><span class="px-3 py-1.5 rounded-full bg-white text-teal text-xs font-bold">${plan.level}</span><span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">🎵 ${musicByAge[plan.group].label}</span>`;
+document.getElementById('workoutTitle').textContent=(titles[plan.group]||titles.adults)+' • '+plan.focus;
+document.getElementById('workoutDesc').textContent=`A ${plan.focus.toLowerCase()} session shaped by your age group, activity level, goal and recent check-ins. ${plan.group==='seniors'?'Use stable support for balance work and stop if unsteady.':plan.group==='kids'?'Keep movement playful with adult supervision.':'Choose a comfortable pace and stop if you feel pain or unwell.'}`;
+document.getElementById('workoutChips').innerHTML=`<span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">⏱ ${plan.totalMin} min</span><span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">🔥 ~${plan.totalCal} kcal</span><span class="px-3 py-1.5 rounded-full bg-white text-teal text-xs font-bold">${plan.level}</span><span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">${plan.focus}</span><span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">🎵 ${musicByAge[plan.group].label}</span>`;
 document.getElementById('workoutTotalCal').textContent='~'+plan.totalCal;
 document.getElementById('workoutTotalTime').textContent=`~${plan.totalMin} min • ${plan.exercises.length} exercises`;
-const inten=plan.group==='teens'?75:plan.group==='kids'?55:plan.group==='seniors'?30:45;
+const inten=plan.adaptation.mode==='gentle'?25:plan.adaptation.mode==='restart'?35:plan.group==='teens'?60:plan.group==='kids'?55:plan.group==='seniors'?30:45;
 document.getElementById('workoutIntensityBar').style.width=inten+'%';
 document.getElementById('workoutIntensityLabel').textContent=`Intensity: ${inten>65?'High':inten>40?'Moderate':'Gentle'} • Great for ${p.goal} goal`;
 document.getElementById('workoutLevelBadge').textContent=plan.level;
@@ -603,7 +704,7 @@ d.innerHTML=`<div class="w-11 h-11 rounded-xl bg-white border flex items-center 
 grid.appendChild(d);
 });
 document.getElementById('workoutWhy').innerHTML=`
-<div class="flex gap-2 bg-teal-50 border border-teal/15 rounded-xl p-2.5"><span>⚖️</span><p class="text-xs"><b>BMI ${calcBmi(p).toFixed(1)} (${bmiCategory(p).split(' ')[0]}):</b> ${calcBmi(p)>=25?'low-impact picks protect joints while burning steadily.':'balanced mix maintains healthy range.'}</p></div>
+<div class="flex gap-2 bg-teal-50 border border-teal/15 rounded-xl p-2.5"><span>🏃</span><p class="text-xs"><b>Starting point:</b> ${p.activity==='sedentary'?'shorter sessions ease you in; build gradually.':'a varied mix balances movement and recovery.'} Choose comfortable options and skip any movement that causes pain.</p></div>
 <div class="flex gap-2 bg-violet-50 border border-violet-200 rounded-xl p-2.5"><span>🎯</span><p class="text-xs"><b>Goal “${p.goal}”:</b> ${p.goal==='muscle'?'extra sets on push/squat for strength.':p.goal==='light'?'lighter cardio + core for mindful lightness.':p.goal==='energy'?'morning cardio bias for all-day energy.':'even mix of cardio + strength.'}</p></div>
 <div class="flex gap-2 bg-amber-50 border border-amber-200 rounded-xl p-2.5"><span>🌤️</span><p class="text-xs"><b>Climate ${p.climate} + activity ${p.activity}:</b> ${p.climate==='hot'?'hydrate 250ml before/after, prefer morning/evening.':'steady pace; warm-up 2 min extra if cold.'} Water target ${(state.hydration.goal/1000).toFixed(1)}L supports this plan.</p></div>`;
 document.getElementById('workoutSleepTip').textContent=`With ${p.sleep}h sleep, ${p.sleep<7?'keep workouts light & finish 3h before bed for better rest.':'keep intense sessions before evening for better rest.'} ${plan.group==='seniors'?'Chair nearby, non-slip footwear.':''}`;
@@ -611,9 +712,9 @@ const sel=document.getElementById('logExercise'); sel.innerHTML=plan.exercises.m
 renderBurn();
 }
 function exCal(e){ const p=state.profile||demoProfiles.adults; return Math.round(e.met*p.weight*(e.mins/60)); }
-function logExerciseIdx(i){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); const e=plan.exercises[i]; const cal=exCal(e); state.workoutLogs.push({date:todayStr(), name:e.name, mins:e.mins, cal}); markTodayStreak(true); save(); renderBurn(); renderStreakCalendar(); showToast(`Logged ${e.name} • ~${cal} kcal 🔥`); celebrate(); }
-function logFullPlan(){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); plan.exercises.forEach(e=>state.workoutLogs.push({date:todayStr(), name:e.name, mins:e.mins, cal:exCal(e)})); markTodayStreak(true); save(); renderBurn(); renderStreakCalendar(); showToast(`Full plan logged • ~${plan.totalCal} kcal 🎉`); celebrate(); }
-function logCustomWorkout(){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); const idx=parseInt(document.getElementById('logExercise').value)||0; const mins=parseInt(document.getElementById('logMins').value)||15; const e=plan.exercises[idx]; const cal=Math.round(e.met*p.weight*(mins/60)); state.workoutLogs.push({date:todayStr(), name:e.name, mins, cal}); save(); renderBurn(); renderStreakCalendar(); showToast(`+${cal} kcal logged`); }
+function logExerciseIdx(i){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); const e=plan.exercises[i]; const cal=exCal(e); state.workoutLogs.push({date:todayStr(), name:e.name, mins:e.mins, cal}); markTodayStreak(true); save(); renderBurn(); renderStreakCalendar(); renderWorkout(); showToast(`Logged ${e.name} • ~${cal} kcal 🔥`); celebrate(); }
+function logFullPlan(){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); plan.exercises.forEach(e=>state.workoutLogs.push({date:todayStr(), name:e.name, mins:e.mins, cal:exCal(e)})); markTodayStreak(true); save(); renderBurn(); renderStreakCalendar(); renderWorkout(); showToast(`Full plan logged • ~${plan.totalCal} kcal 🎉`); celebrate(); }
+function logCustomWorkout(){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); const idx=parseInt(document.getElementById('logExercise').value)||0; const mins=parseInt(document.getElementById('logMins').value)||15; const e=plan.exercises[idx]; const cal=Math.round(e.met*p.weight*(mins/60)); state.workoutLogs.push({date:todayStr(), name:e.name, mins, cal}); save(); renderBurn(); renderStreakCalendar(); renderWorkout(); showToast(`+${cal} kcal logged`); }
 function renderBurn(){
 const logs=state.workoutLogs||[];
 const t=todayStr(); const todayLogs=logs.filter(l=>l.date===t);
