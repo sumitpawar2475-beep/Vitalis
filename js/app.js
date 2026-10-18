@@ -11,7 +11,7 @@ function freshState(user=null){ return {...defaultState,user,hydration:{...defau
 let state=freshState();
 let currentUserId=null, loadingAccountId=null, loadingAccountPromise=null, cloudSaveTimer=null, cloudSaveQueue=Promise.resolve();
 let passwordRecoveryActive=false;
-let communityProfile=null, communityProfileOwnerId=null, communityProfileLoaded=false, communityLoadingUserId=null, communityLoadPromise=null, communitySearchTimer=null, communityOwnPhotos=[], activeCommunityTab='profile', communityGroups=[], communityMemberships=[], activeCommunityId=null, communityFollowedIds=new Set(), communityDirectConversations=[], communityDirectProfiles={}, activeDirectConversationId=null, activeDirectRecipient=null;
+let communityProfile=null, communityProfileOwnerId=null, communityProfileLoaded=false, communityLoadingUserId=null, communityLoadPromise=null, communitySearchTimer=null, communityOwnPhotos=[], communityOwnPosts=[], communityViewingArchive=false, communityProfileEditorOpen=false, communityPostType='blog', activeCommunityTab='profile', communityGroups=[], communityMemberships=[], activeCommunityId=null, communityFollowedIds=new Set(), communityDirectConversations=[], communityDirectProfiles={}, activeDirectConversationId=null, activeDirectRecipient=null;
 let authMode='signin', currentStep=1, currentMealDay=(new Date().getDay()+6)%7, mealData=[], mealPlanBuiltForWeek=null, mealPlanLastSeenDate=todayStr(), activeMealSwapType=null, mealSwapCandidates=[], chartInstance=null, burnChartInstance=null, timerInterval=null, timerSeconds=1200, timerRunning=false, currentRecipe=null, currentAudio=null, currentTrackIdx=-1, musicProgressInt=null;
 
 let demoProfiles={
@@ -94,7 +94,7 @@ function queueCloudSave(ownerId,snapshot){
 }
 async function flushCloudSave(){ if(cloudSaveTimer){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; if(currentUserId) await queueCloudSave(currentUserId,JSON.parse(JSON.stringify(state))); } await cloudSaveQueue; }
 function showAuthStatus(message,isError=false){ const el=document.getElementById('authStatus'); if(!el) return; el.textContent=message; el.classList.remove('hidden','bg-teal-50','border-teal/20','text-teal-dark','bg-rose-50','border-rose-200','text-rose-700'); el.classList.add(isError?'bg-rose-50':'bg-teal-50',isError?'border-rose-200':'border-teal/20',isError?'text-rose-700':'text-teal-dark'); }
-function showSignedOut(){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; currentUserId=null; loadingAccountId=null; loadingAccountPromise=null; communityProfile=null;communityProfileOwnerId=null;communityProfileLoaded=false;communityLoadingUserId=null;communityLoadPromise=null;communityOwnPhotos=[];communityGroups=[];communityMemberships=[];activeCommunityId=null;communityFollowedIds=new Set();communityDirectConversations=[];communityDirectProfiles={};activeDirectConversationId=null;activeDirectRecipient=null; state=freshState(); document.getElementById('app').classList.add('hidden'); document.getElementById('profileSetup').classList.add('hidden'); document.getElementById('loginScreen').classList.remove('hidden'); const pwd=document.getElementById('authPwd'); if(pwd) pwd.value=''; applyTheme(false); }
+function showSignedOut(){ clearTimeout(cloudSaveTimer); cloudSaveTimer=null; currentUserId=null; loadingAccountId=null; loadingAccountPromise=null; communityProfile=null;communityProfileOwnerId=null;communityProfileLoaded=false;communityLoadingUserId=null;communityLoadPromise=null;communityOwnPhotos=[];communityOwnPosts=[];communityViewingArchive=false;communityProfileEditorOpen=false;communityGroups=[];communityMemberships=[];activeCommunityId=null;communityFollowedIds=new Set();communityDirectConversations=[];communityDirectProfiles={};activeDirectConversationId=null;activeDirectRecipient=null; state=freshState(); document.getElementById('app').classList.add('hidden'); document.getElementById('profileSetup').classList.add('hidden'); document.getElementById('loginScreen').classList.remove('hidden'); const pwd=document.getElementById('authPwd'); if(pwd) pwd.value=''; applyTheme(false); }
 async function loadAccount(session){
  const user=session?.user; if(!user||!supabaseClient) return;
  if(currentUserId===user.id) return;
@@ -109,7 +109,7 @@ async function loadAccount(session){
    const saved=data?.state||{};
    state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null,workoutFeedback:saved.workoutFeedback||{},workoutAttendance:saved.workoutAttendance||{},mealPlanVersion:Number(saved.mealPlanVersion)||0,mealPlanOverrides:saved.mealPlanOverrides||{},workoutTrackingStartDate:saved.workoutTrackingStartDate||null};
    currentUserId=user.id;
-   communityProfile=null;communityProfileOwnerId=null;communityProfileLoaded=false;communityLoadingUserId=null;communityLoadPromise=null;communityOwnPhotos=[];communityGroups=[];communityMemberships=[];activeCommunityId=null;communityFollowedIds=new Set();communityDirectConversations=[];communityDirectProfiles={};activeDirectConversationId=null;activeDirectRecipient=null;
+   communityProfile=null;communityProfileOwnerId=null;communityProfileLoaded=false;communityLoadingUserId=null;communityLoadPromise=null;communityOwnPhotos=[];communityOwnPosts=[];communityViewingArchive=false;communityProfileEditorOpen=false;communityGroups=[];communityMemberships=[];activeCommunityId=null;communityFollowedIds=new Set();communityDirectConversations=[];communityDirectProfiles={};activeDirectConversationId=null;activeDirectRecipient=null;
    syncDailyPlan();
    applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
    if(state.profile) showApp(true); else showProfileSetup();
@@ -1011,39 +1011,88 @@ function signedCommunityImage(path){
  return supabaseClient.storage.from('community-media').createSignedUrl(path,300).then(({data,error})=>{if(error)throw error;return data?.signedUrl||'';});
 }
 function renderCommunityEditor(){
- const form=document.getElementById('communityProfileForm'),media=document.getElementById('communityProfileMedia'),badge=document.getElementById('communityProfileBadge'),saveButton=document.getElementById('communityProfileSave');
+ const form=document.getElementById('communityProfileForm'),media=document.getElementById('communityProfileMedia'),badge=document.getElementById('communityProfileBadge'),saveButton=document.getElementById('communityProfileSave'),editor=document.getElementById('communityProfileEditor');
  if(!form) return;
  const profile=communityProfile;
  document.getElementById('communityUsername').value=profile?.username||'';
  document.getElementById('communityDisplayName').value=profile?.display_name||state.profile?.name||'';
  document.getElementById('communityBio').value=profile?.bio||'';
  document.getElementById('communityPublic').checked=!!profile?.is_public;
+ const showEditor=!profile||communityProfileEditorOpen;
+ editor.classList.toggle('hidden',!showEditor);
  media.classList.toggle('hidden',!profile);
  badge.classList.toggle('hidden',!profile);
  badge.textContent=profile?(profile.is_public?'Searchable':'Private'):'';
  saveButton.textContent=profile?'Save profile':'Create community profile';
+ document.getElementById('communityEditProfileToggle').innerHTML=profile?'<i data-lucide="square-pen" class="h-4 w-4"></i><span>Edit profile</span>':'<i data-lucide="user-round-plus" class="h-4 w-4"></i><span>Create profile</span>';
+ document.getElementById('communityCreateMenuToggle').classList.toggle('hidden',!profile);
+ document.getElementById('communityOwnName').textContent=profile?.display_name||'Create your community profile';
+ document.getElementById('communityOwnUsername').textContent=profile?'@'+profile.username+(profile.is_public?' · Searchable':' · Private'): 'Choose a username people can search';
+ document.getElementById('communityOwnBio').textContent=profile?.bio||'';
  const avatar=document.getElementById('communityAvatarPreview');
  if(!profile?.avatar_path){avatar.textContent=communityInitial(profile?.display_name||state.profile?.name);avatar.innerHTML=communityInitial(profile?.display_name||state.profile?.name);}
- else signedCommunityImage(profile.avatar_path).then(url=>{if(communityProfileOwnerId===currentUserId&&url)avatar.innerHTML='<img src="'+communityEscape(url)+'" alt="Your community profile photo" class="w-full h-full object-cover">';}).catch(error=>{console.error('Community avatar load failed:',error);});
+ const ownAvatar=document.getElementById('communityOwnAvatar');
+ const fallback=communityInitial(profile?.display_name||state.profile?.name);
+ avatar.innerHTML=fallback;ownAvatar.innerHTML=fallback;
+ if(profile?.avatar_path)signedCommunityImage(profile.avatar_path).then(url=>{if(communityProfileOwnerId===currentUserId&&url){const img='<img src="'+communityEscape(url)+'" alt="'+communityEscape(profile.display_name)+'" class="w-full h-full object-cover">';avatar.innerHTML=img;ownAvatar.innerHTML=img;}}).catch(error=>{console.error('Community avatar load failed:',error);});
+ document.getElementById('communityCreateMenu').classList.add('hidden');document.getElementById('communityCreateMenuToggle').setAttribute('aria-expanded','false');
+ lucide.createIcons();
 }
+function toggleCommunityProfileEditor(force){if(!communityProfile){communityProfileEditorOpen=true;}else communityProfileEditorOpen=typeof force==='boolean'?force:!communityProfileEditorOpen;renderCommunityEditor();if(communityProfileEditorOpen)document.getElementById('communityUsername')?.focus();}
+function toggleCommunityCreateMenu(){if(!communityProfile){showToast('Create your community profile first.');toggleCommunityProfileEditor(true);return;}const menu=document.getElementById('communityCreateMenu'),open=menu.classList.contains('hidden');menu.classList.toggle('hidden',!open);document.getElementById('communityCreateMenuToggle').setAttribute('aria-expanded',String(open));if(open)lucide.createIcons();}
+function startCommunityPhotoPost(){if(!communityProfile){toggleCommunityProfileEditor(true);return;}document.getElementById('communityCreateMenu').classList.add('hidden');document.getElementById('communityCreateMenuToggle').setAttribute('aria-expanded','false');document.getElementById('communityPhotoInput').click();}
+function openCommunityPostComposer(type){if(!communityProfile){toggleCommunityProfileEditor(true);return;}communityPostType=type==='achievement'?'achievement':'blog';document.getElementById('communityCreateMenu').classList.add('hidden');document.getElementById('communityCreateMenuToggle').setAttribute('aria-expanded','false');const blog=communityPostType==='blog';document.getElementById('communityPostComposerEyebrow').textContent=blog?'SHARE A STORY':'CELEBRATE YOUR PROGRESS';document.getElementById('communityPostComposerTitle').textContent=blog?'Write a blog':'Share an achievement';document.getElementById('communityPostBodyLabel').textContent=blog?'Your story':'What did you accomplish?';document.getElementById('communityPostTitle').placeholder=blog?'A small win worth sharing':'e.g. Completed my first 5K';document.getElementById('communityPostBody').placeholder=blog?'Share your experience, insight, or encouragement…':'Tell people what this achievement means to you…';document.getElementById('communityPostSave').textContent=blog?'Publish blog':'Share achievement';document.getElementById('communityPostComposer').classList.remove('hidden');document.getElementById('communityPostTitle').value='';document.getElementById('communityPostBody').value='';document.getElementById('communityPostTitle').focus();}
+function closeCommunityPostComposer(){document.getElementById('communityPostComposer').classList.add('hidden');document.getElementById('communityPostTitle').value='';document.getElementById('communityPostBody').value='';}
+async function saveCommunityPost(event){event?.preventDefault();if(!communityProfile||!currentUserId)return;const title=document.getElementById('communityPostTitle').value.trim(),body=document.getElementById('communityPostBody').value.trim();if(title.length<2||title.length>90||body.length<2||body.length>4000){setCommunityStatus('Add a title and a little more detail before sharing.',true);return;}const button=document.getElementById('communityPostSave');button.disabled=true;try{const {error}=await supabaseClient.from('community_posts').insert({user_id:currentUserId,post_type:communityPostType,title,body});if(error)throw error;closeCommunityPostComposer();communityViewingArchive=false;await refreshOwnCommunityPosts();setCommunityStatus(communityPostType==='blog'?'Your blog is now on your profile.':'Your achievement is now on your profile.');}catch(error){console.error('VITALIS community post save failed:',error);setCommunityStatus(communityErrorMessage(error),true);}finally{button.disabled=false;}}
+function toggleCommunityArchiveView(){communityViewingArchive=!communityViewingArchive;document.getElementById('communityArchiveToggle').classList.toggle('active',communityViewingArchive);document.querySelector('#communityArchiveToggle span').textContent=communityViewingArchive?'Show profile':'Archive';refreshOwnCommunityGallery().then(refreshOwnCommunityPosts).catch(error=>setCommunityStatus(communityErrorMessage(error),true));}
+function shareCommunityItem(title,description){if(!communityProfile?.is_public){showToast('Make your profile searchable before sharing a post or photo.');return;}const url=window.location.origin;const text=(description?description+' · ':'')+'Find @'+communityProfile.username+' on Vitalis';const payload={title,text,url};if(navigator.share){navigator.share(payload).catch(error=>{if(error?.name!=='AbortError')console.error('Community share failed:',error);});return;}if(navigator.clipboard?.writeText){navigator.clipboard.writeText(text+' — '+url).then(()=>showToast('Vitalis profile link copied.')).catch(()=>showToast('Could not copy the profile link on this browser.'));return;}showToast('Open this profile on a secure browser to share a link.');}
 async function renderCommunityGallery(targetId,photos,isOwner){
  const grid=document.getElementById(targetId); if(!grid) return;
- if(!photos?.length){grid.innerHTML='<div class="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-xs text-slate-500">'+(isOwner?'Your grid is empty. Add a photo when you are ready to share.':'No photos have been shared yet.')+'</div>';return;}
+ if(!photos?.length){grid.innerHTML='<div class="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-xs text-slate-500">'+(isOwner?(communityViewingArchive?'No archived photos.':'Your grid is empty. Add a photo when you are ready to share.'):'No photos have been shared yet.')+'</div>';return;}
  const items=await Promise.all(photos.map(async photo=>({photo,url:await signedCommunityImage(photo.photo_path)})));
- grid.innerHTML=items.map(({photo,url})=>'<figure class="communityPhotoTile"><img src="'+communityEscape(url)+'" alt="'+communityEscape(photo.caption||'Community profile photo')+'" loading="lazy">'+(isOwner?'<button type="button" class="communityPhotoDelete" data-community-delete="'+communityEscape(photo.id)+'" aria-label="Remove photo">×</button>':'')+(photo.caption?'<figcaption>'+communityEscape(photo.caption)+'</figcaption>':'')+'</figure>').join('');
- if(isOwner) grid.onclick=event=>{const button=event.target.closest('[data-community-delete]');if(button)deleteCommunityPhoto(button.dataset.communityDelete);};
+ grid.innerHTML=items.map(({photo,url})=>'<figure class="communityPhotoTile'+(photo.archived_at?' archived':'')+'"><img src="'+communityEscape(url)+'" alt="'+communityEscape(photo.caption||'Community profile photo')+'" loading="lazy">'+(photo.archived_at?'<span class="communityArchivedBadge">Archived</span>':'')+(photo.caption?'<figcaption>'+communityEscape(photo.caption)+'</figcaption>':'')+(isOwner?'<details class="communityItemMenu"><summary aria-label="Photo options"><i data-lucide="more-horizontal" class="h-5 w-5"></i></summary><div class="communityItemMenuPanel"><button type="button" data-community-photo-action="share" data-item-id="'+communityEscape(photo.id)+'"><i data-lucide="share-2" class="h-4 w-4"></i>Share photo</button><button type="button" data-community-photo-action="archive" data-item-id="'+communityEscape(photo.id)+'"><i data-lucide="archive" class="h-4 w-4"></i>'+(photo.archived_at?'Restore photo':'Archive photo')+'</button><button type="button" class="danger" data-community-photo-action="delete" data-item-id="'+communityEscape(photo.id)+'"><i data-lucide="trash-2" class="h-4 w-4"></i>Delete photo</button></div></details>':'')+'</figure>').join('');
+ lucide.createIcons();
+ if(isOwner)grid.onclick=event=>{const button=event.target.closest('[data-community-photo-action]');if(!button)return;event.preventDefault();button.closest('details')?.removeAttribute('open');handleCommunityPhotoAction(button.dataset.itemId,button.dataset.communityPhotoAction);};
 }
 async function refreshOwnCommunityGallery(){
  if(!communityProfile||!currentUserId) return;
- const {data,error}=await supabaseClient.from('community_photos').select('id,user_id,photo_path,caption,created_at').eq('user_id',currentUserId).order('created_at',{ascending:false}).limit(12);
+ const {data,error}=await supabaseClient.from('community_photos').select('id,user_id,photo_path,caption,created_at,archived_at').eq('user_id',currentUserId).order('created_at',{ascending:false}).limit(100);
  if(error) throw error;
- communityOwnPhotos=data||[];
+ communityOwnPhotos=(data||[]).filter(photo=>communityViewingArchive?!!photo.archived_at:!photo.archived_at);
  await renderCommunityGallery('communityOwnGallery',communityOwnPhotos,true);
+}
+async function refreshOwnCommunityPosts(){
+ if(!communityProfile||!currentUserId)return;
+ const {data,error}=await supabaseClient.from('community_posts').select('id,user_id,post_type,title,body,created_at,updated_at,archived_at').eq('user_id',currentUserId).order('created_at',{ascending:false}).limit(60);if(error)throw error;
+ communityOwnPosts=(data||[]).filter(post=>communityViewingArchive?!!post.archived_at:!post.archived_at);renderCommunityPosts('communityOwnPosts',communityOwnPosts,true);
+}
+function renderCommunityPosts(targetId,posts,isOwner){
+ const target=document.getElementById(targetId);if(!target)return;
+ if(!posts?.length){target.innerHTML='<div class="communityPostsEmpty">'+(isOwner?(communityViewingArchive?'No archived stories or achievements.':'Your stories and achievements will appear here.'):'No stories or achievements shared yet.')+'</div>';return;}
+ target.innerHTML=posts.map(post=>'<article class="communityPostCard'+(post.archived_at?' archived':'')+'"><div class="communityPostCardHeader"><span class="communityPostType '+(post.post_type==='achievement'?'achievement':'blog')+'"><i data-lucide="'+(post.post_type==='achievement'?'trophy':'notebook-pen')+'" class="h-4 w-4"></i>'+(post.post_type==='achievement'?'Achievement':'Blog')+'</span><time>'+communityEscape(new Date(post.created_at).toLocaleDateString())+'</time>'+(post.archived_at?'<span class="communityArchivedBadge">Archived</span>':'')+(isOwner?'<details class="communityItemMenu"><summary aria-label="Post options"><i data-lucide="more-horizontal" class="h-5 w-5"></i></summary><div class="communityItemMenuPanel"><button type="button" data-community-post-action="share" data-item-id="'+communityEscape(post.id)+'"><i data-lucide="share-2" class="h-4 w-4"></i>Share post</button><button type="button" data-community-post-action="archive" data-item-id="'+communityEscape(post.id)+'"><i data-lucide="archive" class="h-4 w-4"></i>'+(post.archived_at?'Restore post':'Archive post')+'</button><button type="button" class="danger" data-community-post-action="delete" data-item-id="'+communityEscape(post.id)+'"><i data-lucide="trash-2" class="h-4 w-4"></i>Delete post</button></div></details>':'')+'</div><h5 class="communityPostTitle">'+communityEscape(post.title)+'</h5><p class="communityPostBody">'+communityEscape(post.body)+'</p></article>').join('');lucide.createIcons();
+ if(isOwner)target.onclick=event=>{const button=event.target.closest('[data-community-post-action]');if(!button)return;event.preventDefault();button.closest('details')?.removeAttribute('open');handleCommunityPostAction(button.dataset.itemId,button.dataset.communityPostAction);};
+}
+async function handleCommunityPhotoAction(photoId,action){
+ const photo=communityOwnPhotos.find(item=>item.id===photoId);if(!photo)return;
+ if(action==='share'){shareCommunityItem(photo.caption||'A photo from my Vitalis profile');return;}
+ if(action==='delete'){await deleteCommunityPhoto(photoId);return;}
+ try{const archived=photo.archived_at?null:new Date().toISOString();const {error}=await supabaseClient.from('community_photos').update({archived_at:archived}).eq('id',photoId).eq('user_id',currentUserId);if(error)throw error;await refreshOwnCommunityGallery();setCommunityStatus(archived?'Photo archived from your public profile.':'Photo restored to your profile.');}catch(error){console.error('VITALIS photo archive failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
+}
+async function handleCommunityPostAction(postId,action){
+ const post=communityOwnPosts.find(item=>item.id===postId);if(!post)return;
+ if(action==='share'){shareCommunityItem(post.title,post.body);return;}
+ if(action==='delete'&&!window.confirm('Permanently delete this post? This cannot be undone.'))return;
+ try{if(action==='delete'){const {error}=await supabaseClient.from('community_posts').delete().eq('id',postId).eq('user_id',currentUserId);if(error)throw error;}else{const archived_at=post.archived_at?null:new Date().toISOString();const {error}=await supabaseClient.from('community_posts').update({archived_at,updated_at:new Date().toISOString()}).eq('id',postId).eq('user_id',currentUserId);if(error)throw error;}await refreshOwnCommunityPosts();setCommunityStatus(action==='delete'?'Post deleted.':post.archived_at?'Post restored to your profile.':'Post archived from your profile.');}catch(error){console.error('VITALIS post action failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
+}
+async function loadCommunityFitnessMetrics(userId,own=false){
+ if(own)await flushCloudSave();const {data,error}=await supabaseClient.rpc('get_community_fitness_metrics',{target_user_id_input:userId});if(error)throw error;const metrics=Array.isArray(data)?data[0]||null:data||null;
+ if(own){document.getElementById('communityFitnessScore').textContent=metrics?.fitness_score==null?'—':metrics.fitness_score+'%';document.getElementById('communityCurrentStreak').textContent=String(metrics?.current_streak||0);document.getElementById('communityBestStreak').textContent='Best: '+(metrics?.best_streak||0);document.getElementById('communityMetricsPrivacy').textContent=communityProfile?.is_public?'Your workout and health records stay private. Mutual followers can see this score and streak.':'Your profile is private, so only you can see your score and streak.';return metrics;}
+ return metrics;
 }
 async function loadCommunityHome(force=false){
  if(!supabaseClient||!currentUserId){setCommunityStatus('Sign in to your VITALIS account before using Communities.',true);return;}
  if(!isCommunityAdult()){setCommunityStatus('The Vitalis Communities beta is currently for members aged 18 and over.',true);return;}
- if(!force&&communityProfileLoaded&&communityProfileOwnerId===currentUserId){await loadCommunities();await Promise.all([loadCommunityFeed(),loadCommunityThreads(),loadCommunityFollowState(),loadCommunityDirectInbox()]);return;}
+ if(!force&&communityProfileLoaded&&communityProfileOwnerId===currentUserId){await loadCommunities();await Promise.all([refreshOwnCommunityGallery(),refreshOwnCommunityPosts(),loadCommunityFitnessMetrics(currentUserId,true),loadCommunityFeed(),loadCommunityThreads(),loadCommunityFollowState(),loadCommunityDirectInbox()]);return;}
  if(communityLoadingUserId===currentUserId&&communityLoadPromise) return communityLoadPromise;
  const owner=currentUserId;
  communityLoadingUserId=owner;
@@ -1055,8 +1104,8 @@ async function loadCommunityHome(force=false){
    if(currentUserId!==owner)return;
    communityProfile=data||null;communityProfileOwnerId=owner;communityProfileLoaded=true;
    renderCommunityEditor();
-   if(data){await refreshOwnCommunityGallery();setCommunityStatus(data.is_public?'Your profile is searchable by username.':'Your profile is private and does not appear in search.');}
-   else{communityOwnPhotos=[];document.getElementById('communityOwnGallery').innerHTML='';setCommunityStatus('Choose a unique username to create your Communities profile. It stays private until you make it searchable.');}
+   if(data){communityViewingArchive=false;await Promise.all([refreshOwnCommunityGallery(),refreshOwnCommunityPosts(),loadCommunityFitnessMetrics(owner,true)]);setCommunityStatus(data.is_public?'Your profile is searchable by username.':'Your profile is private and does not appear in search.');}
+   else{communityOwnPhotos=[];communityOwnPosts=[];document.getElementById('communityOwnGallery').innerHTML='';renderCommunityPosts('communityOwnPosts',[],true);document.getElementById('communityFitnessScore').textContent='—';document.getElementById('communityCurrentStreak').textContent='0';document.getElementById('communityBestStreak').textContent='Best: 0';setCommunityStatus('Choose a unique username to create your Communities profile. It stays private until you make it searchable.');}
   }catch(error){console.error('VITALIS Communities load failed:',error);if(currentUserId===owner)setCommunityStatus(communityErrorMessage(error),true);}
   finally{if(communityLoadingUserId===owner){communityLoadingUserId=null;communityLoadPromise=null;}}
  })();
@@ -1081,7 +1130,7 @@ async function saveCommunityProfile(event){
   const payload={user_id:currentUserId,username,display_name:displayName,bio,is_public:isPublic,updated_at:new Date().toISOString()};
   const {data,error}=await supabaseClient.from('community_profiles').upsert(payload,{onConflict:'user_id'}).select('user_id,username,display_name,bio,avatar_path,is_public,created_at,updated_at').single();
   if(error)throw error;
-  communityProfile=data;communityProfileOwnerId=currentUserId;communityProfileLoaded=true;renderCommunityEditor();await refreshOwnCommunityGallery();
+  communityProfile=data;communityProfileOwnerId=currentUserId;communityProfileLoaded=true;communityProfileEditorOpen=false;renderCommunityEditor();await Promise.all([refreshOwnCommunityGallery(),refreshOwnCommunityPosts(),loadCommunityFitnessMetrics(currentUserId,true)]);
   setCommunityStatus(data.is_public?'Profile saved. People can now find you by @'+data.username+'.':'Profile saved privately. Turn on search visibility whenever you are ready.');
  }catch(error){console.error('VITALIS community profile save failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
  finally{button.disabled=false;button.classList.remove('opacity-60');}
@@ -1093,7 +1142,7 @@ async function uploadCommunityImage(event,kind){
   if(!communityProfile||!currentUserId)throw new Error('Create and save your community username before adding photos.');
   if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Choose a JPG, PNG, or WebP image.');
   if(file.size>5242880)throw new Error('Each image must be 5 MB or smaller.');
-  if(kind==='gallery'&&communityOwnPhotos.length>=12)throw new Error('Your profile grid can contain up to 12 photos.');
+  if(kind==='gallery'){const {count,error:countError}=await supabaseClient.from('community_photos').select('id',{count:'exact',head:true}).eq('user_id',currentUserId).is('archived_at',null);if(countError)throw countError;if(count>=12)throw new Error('Your profile grid can contain up to 12 active photos.');}
   setCommunityStatus('Uploading your photo…');
   const ext=file.type==='image/jpeg'?'jpg':file.type==='image/png'?'png':'webp';
   const folder=kind==='avatar'?'avatars':'photos';
@@ -1112,6 +1161,7 @@ async function uploadCommunityImage(event,kind){
    const {error:insertError}=await supabaseClient.from('community_photos').insert({user_id:currentUserId,photo_path:path,caption});
    if(insertError){await supabaseClient.storage.from('community-media').remove([path]);throw insertError;}
    document.getElementById('communityPhotoCaption').value='';
+   communityViewingArchive=false;document.getElementById('communityArchiveToggle').classList.remove('active');document.querySelector('#communityArchiveToggle span').textContent='Archive';
    await refreshOwnCommunityGallery();setCommunityStatus('Photo added to your profile grid.');
   }
  }catch(error){console.error('VITALIS community image upload failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
@@ -1159,12 +1209,15 @@ async function openCommunityProfile(userId){
   if(error)throw error;
   if(!profile){panel.innerHTML='<p class="text-sm text-slate-600">This profile is private or no longer available.</p>';return;}
   let avatar='';if(profile.avatar_path)avatar=await signedCommunityImage(profile.avatar_path);
-  const {data:photos,error:photoError}=await supabaseClient.from('community_photos').select('id,user_id,photo_path,caption,created_at').eq('user_id',userId).order('created_at',{ascending:false}).limit(12);
+  const [{data:photos,error:photoError},{data:posts,error:postsError}]=await Promise.all([supabaseClient.from('community_photos').select('id,user_id,photo_path,caption,created_at,archived_at').eq('user_id',userId).is('archived_at',null).order('created_at',{ascending:false}).limit(12),supabaseClient.from('community_posts').select('id,user_id,post_type,title,body,created_at,updated_at,archived_at').eq('user_id',userId).is('archived_at',null).order('created_at',{ascending:false}).limit(60)]);
   if(photoError)throw photoError;
+  if(postsError)throw postsError;
   const followed=communityFollowedIds.has(profile.user_id);
-  panel.innerHTML='<div class="flex items-start gap-3"><div class="communityMemberAvatar !w-16 !h-16 text-xl">'+(avatar?'<img src="'+communityEscape(avatar)+'" alt="'+communityEscape(profile.display_name)+'">':communityInitial(profile.display_name))+'</div><div class="flex-1 min-w-0"><p class="text-xs font-bold tracking-[.14em] text-teal">VITALIS MEMBER</p><h3 class="text-xl font-extrabold font-display mt-1">'+communityEscape(profile.display_name)+'</h3><p class="text-sm text-teal font-semibold">@'+communityEscape(profile.username)+'</p><p class="text-sm text-slate-600 mt-2 whitespace-pre-line">'+communityEscape(profile.bio||'')+'</p><div class="communityMemberActions mt-3"><button type="button" class="communityFollowButton'+(followed?' following':'')+'" data-community-profile-follow="'+communityEscape(profile.user_id)+'">'+(followed?'Following':'Follow')+'</button><button type="button" class="communityMessagePersonButton" data-community-profile-message="'+communityEscape(profile.user_id)+'">Message</button></div></div><button type="button" class="text-slate-400 hover:text-slate-700" onclick="document.getElementById(\'communityViewedProfile\').classList.add(\'hidden\')" aria-label="Close profile">✕</button></div><div class="mt-5"><p class="text-xs font-bold tracking-[.14em] text-teal mb-3">PHOTO GRID</p><div id="communityViewedGallery" class="communityPhotoGrid"></div></div>';
+  const metrics=await loadCommunityFitnessMetrics(userId,false);
+  const metricMarkup=metrics?'<div class="communityViewedStats"><article><i data-lucide="sparkles" class="h-4 w-4"></i><div><b>'+(metrics.fitness_score==null?'Building…':metrics.fitness_score+'%')+'</b><span>Fitness score</span></div></article><article><i data-lucide="flame" class="h-4 w-4"></i><div><b>'+metrics.current_streak+'</b><span>Day streak · best '+metrics.best_streak+'</span></div></article></div><p class="communityMetricNote">30-day consistency estimate from completed daily goals; not a medical or verified fitness measure.</p>':'<div class="communityMetricsLocked"><i data-lucide="lock-keyhole" class="h-4 w-4"></i><span>Fitness score and streak are shared with mutual followers only.</span></div>';
+  panel.innerHTML='<div class="communityViewedHeader"><div class="communityMemberAvatar communityViewedAvatar">'+(avatar?'<img src="'+communityEscape(avatar)+'" alt="'+communityEscape(profile.display_name)+'">':communityInitial(profile.display_name))+'</div><div class="flex-1 min-w-0"><p class="communityEyebrow">VITALIS MEMBER</p><h3 class="communityOwnName mt-1">'+communityEscape(profile.display_name)+'</h3><p class="communityOwnUsername">@'+communityEscape(profile.username)+'</p><p class="communityOwnBio mt-2">'+communityEscape(profile.bio||'')+'</p><div class="communityMemberActions !pl-0 mt-3"><button type="button" class="communityFollowButton'+(followed?' following':'')+'" data-community-profile-follow="'+communityEscape(profile.user_id)+'">'+(followed?'Following':'Follow')+'</button><button type="button" class="communityMessagePersonButton" data-community-profile-message="'+communityEscape(profile.user_id)+'">Message</button></div></div><button type="button" class="communityIconButton" onclick="document.getElementById(\'communityViewedProfile\').classList.add(\'hidden\')" aria-label="Close profile"><i data-lucide="x" class="h-4 w-4"></i></button></div>'+metricMarkup+'<div class="mt-6"><p class="communityEyebrow mb-3">PHOTO GRID</p><div id="communityViewedGallery" class="communityPhotoGrid"></div></div><div class="mt-6"><p class="communityEyebrow mb-3">STORIES & ACHIEVEMENTS</p><div id="communityViewedPosts" class="communityOwnPosts"></div></div>';
   panel.onclick=event=>{const follow=event.target.closest('[data-community-profile-follow]'),message=event.target.closest('[data-community-profile-message]');if(follow)toggleCommunityFollow(follow.dataset.communityProfileFollow,follow);else if(message)messageCommunityPerson(message.dataset.communityProfileMessage);};
-  await renderCommunityGallery('communityViewedGallery',photos||[],false);
+  await Promise.all([renderCommunityGallery('communityViewedGallery',photos||[],false),Promise.resolve(renderCommunityPosts('communityViewedPosts',posts||[],false))]);
  }catch(error){console.error('VITALIS community profile open failed:',error);panel.innerHTML='<p class="text-sm text-rose-700">'+communityEscape(communityErrorMessage(error))+'</p>';}
 }
 async function loadCommunityFollowState(){
@@ -1181,6 +1234,7 @@ async function toggleCommunityFollow(userId,button){
   if(result.error)throw result.error;
   if(following)communityFollowedIds.delete(userId);else communityFollowedIds.add(userId);
   document.querySelectorAll('[data-community-follow],[data-community-profile-follow]').forEach(el=>{const id=el.dataset.communityFollow||el.dataset.communityProfileFollow;if(id!==userId)return;const nowFollowing=communityFollowedIds.has(userId);el.textContent=nowFollowing?'Following':'Follow';el.classList.toggle('following',nowFollowing);});
+  const viewed=document.getElementById('communityViewedProfile');if(button&&viewed?.contains(button))await openCommunityProfile(userId);
   showToast(following?'You unfollowed this member.':'You are now following this member.');
  }catch(error){console.error('VITALIS follow update failed:',error);setCommunityStatus(communityErrorMessage(error),true);}
  finally{if(button)button.disabled=false;}
