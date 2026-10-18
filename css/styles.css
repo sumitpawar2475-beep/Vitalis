@@ -71,3 +71,5 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 .cal-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:12px;font-size:12px;font-weight:800;position:relative;border:1px solid transparent}
 .work-card{transition:all .25s ease}.work-card:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(15,118,110,.16)}
 .gauge-needle{transition:transform .6s cubic-bezier(.34,1.56,.64,1);transform-origin:50% 90%}
+
+.cal-cell{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.cal-cell:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,118,110,.16)}.cal-cell:focus-visible{outline:2px solid #0F766E;outline-offset:2px}

@@ -6,8 +6,8 @@ const VITALIS_PUSH_PUBLIC_KEY = 'PASTE_PUBLIC_VAPID_KEY_HERE';
 const supabaseClient = window.supabase && !SUPABASE_URL.includes('YOUR_PROJECT_ID') && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
-const defaultState={ user:null, profile:null, ageStyle:'adults', units:'metric', lang:'en', theme:'light', hydration:{ consumed:0, goal:2300, glasses:[false,false,false,false,false,false,false,false], scheduleDone:{} }, reduceMotion:false, reminders:false, servings:2, prepStyle:'standard', workoutLogs:[], streakMap:{}, profilePic:null, profilePicTemp:null };
-function freshState(user=null){ return {...defaultState,user,hydration:{...defaultState.hydration,glasses:[...defaultState.hydration.glasses],scheduleDone:{}},workoutLogs:[],streakMap:{}}; }
+const defaultState={ user:null, profile:null, ageStyle:'adults', units:'metric', lang:'en', theme:'light', hydration:{ consumed:0, goal:2300, glasses:[false,false,false,false,false,false,false,false], scheduleDone:{} }, reduceMotion:false, reminders:false, servings:2, prepStyle:'standard', workoutLogs:[], streakMap:{}, dailyRecords:{}, dailyPlanDate:null, profilePic:null, profilePicTemp:null };
+function freshState(user=null){ return {...defaultState,user,hydration:{...defaultState.hydration,glasses:[...defaultState.hydration.glasses],scheduleDone:{}},workoutLogs:[],streakMap:{},dailyRecords:{},dailyPlanDate:null}; }
 let state=freshState();
 let currentUserId=null, loadingAccountId=null, loadingAccountPromise=null, cloudSaveTimer=null, cloudSaveQueue=Promise.resolve();
 let passwordRecoveryActive=false;
@@ -103,8 +103,9 @@ async function loadAccount(session){
   const {data,error}=await supabaseClient.from('user_app_state').select('state').eq('user_id',user.id).maybeSingle();
   if(error) throw error; if(loadingAccountId!==user.id) return;
   const saved=data?.state||{};
-  state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{}};
+  state={...freshState({id:user.id,email:user.email}),...saved,user:{id:user.id,email:user.email},hydration:{...defaultState.hydration,...(saved.hydration||{}),scheduleDone:{...(saved.hydration?.scheduleDone||{})}},workoutLogs:Array.isArray(saved.workoutLogs)?saved.workoutLogs:[],streakMap:saved.streakMap||{},dailyRecords:saved.dailyRecords||{},dailyPlanDate:saved.dailyPlanDate||null};
   currentUserId=user.id; loadingAccountId=null; loadingAccountPromise=null;
+  syncDailyPlan();
   applyAgeStyle(state.ageStyle); applyTheme(false); setUnits(state.units,false); generateMeals(); renderAll(); applyLang();
   if(state.profile) showApp(true); else showProfileSetup();
   if(state.reminders && state.profile) syncExistingHydrationPush();
@@ -114,7 +115,47 @@ async function loadAccount(session){
 }
 async function signOut(){ if(!supabaseClient){showAuthStatus('Connect this website to Supabase before signing in.',true);return;} try{await flushCloudSave();const {error}=await supabaseClient.auth.signOut();if(error)throw error;showSignedOut();showToast('You have been signed out.');}catch(error){console.error(error);showToast('Could not sign out. Please try again.');} }
 function todayStr(offset=0){ const d=new Date(); d.setDate(d.getDate()+offset); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); }
-function seedStreak(){}
+function shiftDateKey(dateKey,offset){ const [y,m,d]=dateKey.split('-').map(Number); const value=new Date(y,m-1,d+offset,12); return [value.getFullYear(),String(value.getMonth()+1).padStart(2,'0'),String(value.getDate()).padStart(2,'0')].join('-'); }
+function syncDailyPlan(){
+ const today=todayStr(); state.dailyRecords=state.dailyRecords||{}; state.streakMap=state.streakMap||{};
+ const previous=state.dailyPlanDate;
+ if(previous&&previous<today){
+  for(let day=previous;day<today;day=shiftDateKey(day,1)){
+   if(!state.dailyRecords[day]){
+    const logs=(state.workoutLogs||[]).filter(log=>log.date===day);
+    state.dailyRecords[day]={waterMl:day===previous?Number(state.hydration.consumed)||0:0,waterGoal:Number(state.hydration.goal)||2300,workoutCount:logs.length};
+   }
+   const record=state.dailyRecords[day];
+   state.streakMap[day]=Number(record.waterMl)>=Number(state.hydration.goal)||Number(record.workoutCount)>0;
+  }
+  state.hydration={...state.hydration,consumed:0,glasses:Array.from({length:Math.max(1,Math.ceil(state.hydration.goal/250))},()=>false),scheduleDone:{}};
+  state.dailyPlanDate=today; save();
+ }else if(previous!==today){ state.dailyPlanDate=today; }
+}
+function getStreakDayData(dateKey){
+ const record=state.dailyRecords?.[dateKey]||{};
+ const logs=(state.workoutLogs||[]).filter(log=>log.date===dateKey);
+ const waterMl=dateKey===todayStr()?Number(state.hydration.consumed)||0:Number(record.waterMl)||0;
+ const waterGoal=Number(dateKey===todayStr()?state.hydration.goal:record.waterGoal)||Number(state.hydration.goal)||2300;
+ const workoutCount=dateKey===todayStr()?logs.length:Number(record.workoutCount??logs.length)||0;
+ const legacyOnly=!state.dailyRecords?.[dateKey]&&dateKey<todayStr()&&state.streakMap?.[dateKey]===true;
+ const waterDone=waterMl>=waterGoal||legacyOnly, workoutDone=workoutCount>0;
+ const completed=legacyOnly?1:Number(waterDone)+Number(workoutDone);
+ const total=legacyOnly?1:2;
+ const status=legacyOnly?'complete':completed===2?'complete':completed>0?'partial':dateKey>=todayStr()?'pending':'missed';
+ return {dateKey,waterMl,waterGoal,waterDone,workoutCount,workoutDone,completed,total,status,logs,legacyOnly};
+}
+function showStreakDay(dateKey){
+ const panel=document.getElementById('streakDayDetails'); if(!panel) return;
+ const data=getStreakDayData(dateKey);
+ const date=new Date(dateKey+'T12:00:00').toLocaleDateString(state.lang==='hi'?'hi-IN':'en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+ const statusLabel={complete:'All targets completed',partial:'Some targets completed',missed:'No targets completed',pending:'Day in progress'}[data.status];
+ const waterLine=data.waterDone?'Water goal completed':'Water goal not completed';
+ const workoutLine=data.workoutDone?'Workout completed':'Workout not completed';
+ const logLines=data.logs.map(log=>'<li>'+log.name+' • '+log.mins+' min • ~'+log.cal+' kcal</li>').join('');
+ panel.classList.remove('hidden');
+ panel.innerHTML='<div class="flex items-start justify-between gap-3"><div><p class="text-sm font-bold">'+date+'</p><p class="text-xs text-slate-500 mt-1">'+statusLabel+' • '+data.completed+'/'+data.total+' targets</p></div><button type="button" onclick="document.getElementById(\'streakDayDetails\').classList.add(\'hidden\')" class="text-xs text-slate-500 underline">Close</button></div><div class="grid sm:grid-cols-2 gap-2 mt-3"><div class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm"><p class="font-bold">💧 Hydration</p><p class="text-slate-600 mt-1">'+data.waterMl.toLocaleString()+' / '+data.waterGoal.toLocaleString()+' ml</p><p class="text-xs mt-1 '+(data.waterDone?'text-emerald-700':'text-rose-600')+'">'+waterLine+'</p></div><div class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm"><p class="font-bold">🏃 Workout</p><p class="text-slate-600 mt-1">'+data.workoutCount+' workout'+(data.workoutCount===1?'':'s')+' logged</p><p class="text-xs mt-1 '+(data.workoutDone?'text-emerald-700':'text-rose-600')+'">'+workoutLine+'</p>'+(logLines?'<ul class="text-xs text-slate-500 mt-2 space-y-1">'+logLines+'</ul>':'')+'</div></div>';
+}
 
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushCloudSave();});
 document.addEventListener('DOMContentLoaded', async()=>{
@@ -125,6 +166,7 @@ document.addEventListener('DOMContentLoaded', async()=>{
  document.getElementById('reduceMotion').checked=state.reduceMotion||window.matchMedia('(prefers-reduced-motion: reduce)').matches;
  document.getElementById('waterTargetRange').value=state.hydration.goal; generateMeals(); renderAll(); updateAutoAvatarLive(); applyLang();
  if(!supabaseClient){ showAuthStatus('Account sign-in is not configured yet. Add your Supabase Project URL and publishable key, then run docs/SUPABASE_SETUP.md.',true); return; }
+ setInterval(()=>{if(state.dailyPlanDate!==todayStr()){syncDailyPlan();generateMeals();renderAll();}},60000);
  supabaseClient.auth.onAuthStateChange((event,session)=>{ setTimeout(()=>{ if(event==='PASSWORD_RECOVERY'){showPasswordRecovery();return;} if(session) loadAccount(session).catch(error=>{console.error(error);showAuthStatus('Could not load your saved account data. Check the database setup or browser console.',true);}); else if(event==='SIGNED_OUT') showSignedOut(); },0); });
  const {data,error}=await supabaseClient.auth.getSession();
  if(error){ showAuthStatus('Could not connect to authentication. Check your Supabase configuration.',true); return; }
@@ -323,33 +365,35 @@ chartInstance=new Chart(ctx,{type:'doughnut',data:{labels:['Carbs','Protein','Fa
 
 /* STREAK CALENDAR */
 function renderStreakCalendar(){
-const grid=document.getElementById('streakGrid'); if(!grid) return;
-const now=new Date(); const y=now.getFullYear(), m=now.getMonth();
-document.getElementById('streakMonthLabel').textContent=now.toLocaleDateString(state.lang==='hi'?'hi-IN':'en-US',{month:'long',year:'numeric'})+' • Green = goal met, light = missed';
-const first=new Date(y,m,1).getDay(); const days=new Date(y,m+1,0).getDate();
-let html='';
-for(let i=0;i<first;i++) html+=`<div></div>`;
-let monthDone=0, monthTotal=0;
-for(let d=1;d<=days;d++){
-const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-const isToday=ds===todayStr();
-const isFuture=new Date(ds)>new Date(todayStr());
-let cls='bg-slate-50 border-slate-100 text-slate-400', icon='';
-if(isFuture){ cls='bg-slate-50/50 border-slate-100 text-slate-300'; }
-else if(state.streakMap[ds]===true){ cls='bg-emerald-500 text-white border-emerald-600 shadow'; icon='✓'; monthDone++; monthTotal++; }
-else if(state.streakMap[ds]===false){ cls='bg-rose-100 text-rose-500 border-rose-200'; icon='✕'; monthTotal++; }
-else if(!isFuture){ const past=new Date(ds)<new Date(todayStr()); if(past){ cls='bg-slate-100 text-slate-400 border-slate-200'; icon='·'; } }
-if(isToday) cls+=' ring-2 ring-teal ring-offset-1';
-html+=`<div class="cal-cell ${cls} ${isToday?'font-black':''}">${d}<span class="text-[9px] leading-none">${isToday?'TODAY':icon}</span></div>`;
-}
-grid.innerHTML=html;
-let cur=0; for(let i=0;i<30;i++){ const ds=todayStr(-i); if(state.streakMap[ds]===true||(i===0&&state.hydration.consumed>=state.hydration.goal)) cur++; else if(i===0&&state.hydration.consumed<state.hydration.goal*0.5&&state.streakMap[ds]!==true){ if(i===0) continue; else break; } else if(state.streakMap[ds]===false) break; else if(i>2) break; }
-if(state.hydration.consumed>=state.hydration.goal) cur=Math.max(cur,1);
-document.getElementById('streakCurrent').textContent=cur;
-document.getElementById('dashStreakChip').textContent=cur+'-day gentle streak';
-let best=0, run=0; Object.keys(state.streakMap).sort().forEach(k=>{ if(state.streakMap[k]){ run++; best=Math.max(best,run);} else run=0; });
-document.getElementById('streakBest').textContent=Math.max(best,cur);
-document.getElementById('streakMonthPct').textContent=(monthTotal?Math.round(monthDone/monthTotal*100):0)+'%';
+ const grid=document.getElementById('streakGrid'); if(!grid) return;
+ syncDailyPlan();
+ const now=new Date(),y=now.getFullYear(),m=now.getMonth(),today=todayStr();
+ document.getElementById('streakMonthLabel').textContent=now.toLocaleDateString(state.lang==='hi'?'hi-IN':'en-US',{month:'long',year:'numeric'})+' • Green = all targets, blue = partial, red = missed';
+ const first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate();
+ let html='',monthDone=0,monthTotal=0;
+ for(let i=0;i<first;i++) html+='<div></div>';
+ for(let d=1;d<=days;d++){
+  const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const data=getStreakDayData(ds),isToday=ds===today;
+  let cls='bg-slate-50 border-slate-100 text-slate-400',icon='';
+  if(data.status==='complete'){cls='bg-emerald-500 text-white border-emerald-600 shadow';icon='✓';monthDone++;monthTotal++;}
+  else if(data.status==='partial'){cls='bg-sky-500 text-white border-sky-600 shadow-sm';icon=data.completed+'/'+data.total;monthTotal++;}
+  else if(data.status==='missed'){cls='bg-rose-100 text-rose-600 border-rose-200';icon='✕';monthTotal++;}
+  else if(ds>today){cls='bg-slate-50/50 border-slate-100 text-slate-300';}
+  if(isToday) cls+=' ring-2 ring-teal ring-offset-1';
+  html+=`<button type="button" class="cal-cell ${cls} ${isToday?'font-black':''}" aria-label="Show performance for ${ds}" onclick="showStreakDay('${ds}')">${d}<span class="text-[9px] leading-none">${isToday?'TODAY':icon}</span></button>`;
+ }
+ grid.innerHTML=html;
+ let current=0;
+ for(let i=0;i<366;i++){const data=getStreakDayData(shiftDateKey(today,-i));if(data.status==='complete')current++;else break;}
+ document.getElementById('streakCurrent').textContent=current;
+ document.getElementById('dashStreakChip').textContent=current+'-day gentle streak';
+ let best=0,run=0;
+ const known=Object.keys(state.dailyRecords||{}).concat(Object.keys(state.streakMap||{}),[today]).sort();
+ const first=known[0]||today;
+ for(let ds=first;ds<=today;ds=shiftDateKey(ds,1)){if(getStreakDayData(ds).status==='complete'){run++;best=Math.max(best,run);}else run=0;}
+ document.getElementById('streakBest').textContent=Math.max(best,current);
+ document.getElementById('streakMonthPct').textContent=(monthTotal?Math.round(monthDone/monthTotal*100):0)+'%';
 }
 function markTodayStreak(done=true){ state.streakMap[todayStr()]=done; save(); renderStreakCalendar(); }
 
@@ -569,7 +613,7 @@ renderBurn();
 function exCal(e){ const p=state.profile||demoProfiles.adults; return Math.round(e.met*p.weight*(e.mins/60)); }
 function logExerciseIdx(i){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); const e=plan.exercises[i]; const cal=exCal(e); state.workoutLogs.push({date:todayStr(), name:e.name, mins:e.mins, cal}); markTodayStreak(true); save(); renderBurn(); renderStreakCalendar(); showToast(`Logged ${e.name} • ~${cal} kcal 🔥`); celebrate(); }
 function logFullPlan(){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); plan.exercises.forEach(e=>state.workoutLogs.push({date:todayStr(), name:e.name, mins:e.mins, cal:exCal(e)})); markTodayStreak(true); save(); renderBurn(); renderStreakCalendar(); showToast(`Full plan logged • ~${plan.totalCal} kcal 🎉`); celebrate(); }
-function logCustomWorkout(){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); const idx=parseInt(document.getElementById('logExercise').value)||0; const mins=parseInt(document.getElementById('logMins').value)||15; const e=plan.exercises[idx]; const cal=Math.round(e.met*p.weight*(mins/60)); state.workoutLogs.push({date:todayStr(), name:e.name, mins, cal}); markTodayStreak(true); save(); renderBurn(); renderStreakCalendar(); showToast(`+${cal} kcal logged`); }
+function logCustomWorkout(){ const p=state.profile||demoProfiles.adults; const plan=getWorkoutPlan(p); const idx=parseInt(document.getElementById('logExercise').value)||0; const mins=parseInt(document.getElementById('logMins').value)||15; const e=plan.exercises[idx]; const cal=Math.round(e.met*p.weight*(mins/60)); state.workoutLogs.push({date:todayStr(), name:e.name, mins, cal}); save(); renderBurn(); renderStreakCalendar(); showToast(`+${cal} kcal logged`); }
 function renderBurn(){
 const logs=state.workoutLogs||[];
 const t=todayStr(); const todayLogs=logs.filter(l=>l.date===t);
