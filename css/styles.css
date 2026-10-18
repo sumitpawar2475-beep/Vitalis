@@ -73,3 +73,25 @@ body.dark-active .bg-teal-50 p,body.dark-active .bg-amber-50 p,body.dark-active 
 .gauge-needle{transition:transform .6s cubic-bezier(.34,1.56,.64,1);transform-origin:50% 90%}
 
 .cal-cell{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.cal-cell:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,118,110,.16)}.cal-cell:focus-visible{outline:2px solid #0F766E;outline-offset:2px}
+
+/* Vitalis Communities mode */
+.modeToggle{white-space:nowrap;transition:background-color .18s ease,color .18s ease,border-color .18s ease}
+#app.community-mode .appLayout{display:block}
+#app.community-mode .appLayout>nav,#app.community-mode .appLayout>.lg\:hidden{display:none!important}
+#app.community-mode .appLayout main{padding-bottom:1.5rem}
+#app.community-mode .view{display:none}
+#app.community-mode #view-communities.active{display:block}
+.communityHero{background:linear-gradient(120deg,#0F766E 0%,#0D9488 48%,#5B55B8 100%);box-shadow:0 22px 55px rgba(15,118,110,.18)}
+.communityFeature,.communityPanel{background:#fff;border:1px solid #E2E8F0;border-radius:20px;padding:18px;box-shadow:0 8px 24px rgba(15,23,42,.035)}
+.communityFeature{transition:transform .2s ease,box-shadow .2s ease}
+.communityFeature:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(15,118,110,.08)}
+.communityIcon{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center}
+.communityEmpty{min-height:220px;border:1px dashed #CBD5E1;border-radius:18px;background:linear-gradient(145deg,#F8FAFC,#F0FDFA);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
+.communityEmpty.compact{min-height:160px;margin-top:14px}
+.communityEmptyIcon{width:50px;height:50px;border-radius:16px;background:#fff;color:#0F766E;border:1px solid #CCFBF1;display:flex;align-items:center;justify-content:center}
+.communitySafety{display:flex;gap:12px;align-items:flex-start;padding:16px;border:1px solid #CCFBF1;background:#F0FDFA;color:#0F766E;border-radius:18px}
+body.dark-active .communityFeature,body.dark-active .communityPanel{background:#13273E;border-color:#23405E}
+body.dark-active .communityEmpty{background:linear-gradient(145deg,#102239,#0F3A36);border-color:#31516B}
+body.dark-active .communityEmptyIcon{background:#13273E;border-color:#23405E}
+body.dark-active .communitySafety{background:#0F3A36;border-color:#1A5A53;color:#99F6E4}
+@media(max-width:640px){.communityHero{border-radius:22px}.communityPanel{padding:15px}.communityEmpty{min-height:190px}}
