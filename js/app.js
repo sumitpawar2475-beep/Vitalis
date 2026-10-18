@@ -649,10 +649,11 @@ else ex=[
 {name:'Surya Namaskar Light',icon:'☀️',sets:'3 rounds',reps:'Slow flow',mins:5,met:4,desc:'Full-body mobility & breath.'}];
 
 if(p.goal==='muscle'&&group!=='kids'&&group!=='seniors'){ ex.forEach(e=>{ if(/push|squat|lunge/i.test(e.name)) e.sets='4 sets'; }); }
-if(p.activity==='sedentary') ex=ex.map(e=>({...e,mins:Math.max(2,Math.round(e.mins*.8)),sets:e.sets.replace(/(\d+) sets?/,(_,n)=>Math.max(1,Math.floor(Number(n)*.8))+' sets')}));
+
 const focus=weeklyWorkoutFocus(group);
 if(!['kids'].includes(group)&&focus!=='Strength A'&&focus!=='Strength B'&&focus!=='Strength + balance'&&focus!=='Sport or active play') ex=movementSession(focus,group);
 else if(group==='teens'&&focus==='Sport or active play') ex=movementSession(focus,group);
+if(p.activity==='sedentary') ex=ex.map(e=>({...e,mins:Math.max(2,Math.round(e.mins*.8)),sets:e.sets.replace(/(\\d+) sets?/,(_,n)=>Math.max(1,Math.floor(Number(n)*.8))+' sets')}));
 if(group==='teens'&&(focus==='Strength A'||focus==='Strength B')) ex=[
  {name:'Easy warm-up walk',icon:'🚶',sets:'1 round',reps:'4 min',mins:4,met:3,desc:'Start easy and increase pace only if it feels comfortable.'},
  {name:'Incline push-ups',icon:'💪',sets:'2 sets',reps:'8-10 reps',mins:4,met:4,desc:'Use a sturdy counter or wall; stop before form breaks.'},
@@ -688,7 +689,7 @@ if(coach){
 document.getElementById('workoutEyebrow').textContent=`SUGGESTED FOR ${p.name.toUpperCase()} • ${p.activity.toUpperCase()} • ${p.goal.toUpperCase()}`;
 const titles={kids:'Playful power • Fun & bouncy 🌈',teens:'Fresh & fierce • HIIT energy ⚡',adults:'Balanced full-body • Gentle & steady 💪',seniors:'Steady & safe • Chair-friendly ☀️'};
 document.getElementById('workoutTitle').textContent=(titles[plan.group]||titles.adults)+' • '+plan.focus;
-document.getElementById('workoutDesc').textContent=`A ${plan.focus.toLowerCase()} session shaped by your age group, activity level, goal and recent check-ins. ${plan.group==='seniors'?'Use stable support for balance work and stop if unsteady.':plan.group==='kids'?'Keep movement playful with adult supervision.':'Choose a comfortable pace and stop if you feel pain or unwell.'}`;
+document.getElementById('workoutDesc').textContent=`A ${plan.focus.toLowerCase()} session shaped by your age group, activity level, goal and recent check-ins. ${plan.group==='seniors'?'Use stable support for balance work and stop if unsteady.':plan.group==='kids'||plan.group==='teens'?'Add active play or sport through the day; this plan is only one part of daily movement.':'Choose a comfortable pace and stop if you feel pain or unwell.'}`;
 document.getElementById('workoutChips').innerHTML=`<span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">⏱ ${plan.totalMin} min</span><span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">🔥 ~${plan.totalCal} kcal</span><span class="px-3 py-1.5 rounded-full bg-white text-teal text-xs font-bold">${plan.level}</span><span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">${plan.focus}</span><span class="px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-semibold">🎵 ${musicByAge[plan.group].label}</span>`;
 document.getElementById('workoutTotalCal').textContent='~'+plan.totalCal;
 document.getElementById('workoutTotalTime').textContent=`~${plan.totalMin} min • ${plan.exercises.length} exercises`;
