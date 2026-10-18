@@ -123,7 +123,7 @@ function syncDailyPlan(){
   for(let day=previous;day<today;day=shiftDateKey(day,1)){
    if(!state.dailyRecords[day]){
     const logs=(state.workoutLogs||[]).filter(log=>log.date===day);
-    state.dailyRecords[day]={waterMl:day===previous?Number(state.hydration.consumed)||0:0,workoutCount:logs.length};
+    state.dailyRecords[day]={waterMl:day===previous?Number(state.hydration.consumed)||0:0,waterGoal:Number(state.hydration.goal)||2300,workoutCount:logs.length};
    }
    const record=state.dailyRecords[day];
    state.streakMap[day]=Number(record.waterMl)>=Number(state.hydration.goal)||Number(record.workoutCount)>0;
@@ -136,7 +136,7 @@ function getStreakDayData(dateKey){
  const record=state.dailyRecords?.[dateKey]||{};
  const logs=(state.workoutLogs||[]).filter(log=>log.date===dateKey);
  const waterMl=dateKey===todayStr()?Number(state.hydration.consumed)||0:Number(record.waterMl)||0;
- const waterGoal=Number(state.hydration.goal)||2300;
+ const waterGoal=Number(dateKey===todayStr()?state.hydration.goal:record.waterGoal)||Number(state.hydration.goal)||2300;
  const workoutCount=dateKey===todayStr()?logs.length:Number(record.workoutCount??logs.length)||0;
  const legacyOnly=!state.dailyRecords?.[dateKey]&&dateKey<todayStr()&&state.streakMap?.[dateKey]===true;
  const waterDone=waterMl>=waterGoal||legacyOnly, workoutDone=workoutCount>0;
@@ -389,8 +389,9 @@ function renderStreakCalendar(){
  document.getElementById('streakCurrent').textContent=current;
  document.getElementById('dashStreakChip').textContent=current+'-day gentle streak';
  let best=0,run=0;
- const dates=Object.keys(state.dailyRecords||{}).concat(Object.keys(state.streakMap||{}),[today]).filter((v,i,all)=>all.indexOf(v)===i).sort();
- dates.forEach(ds=>{if(getStreakDayData(ds).status==='complete'){run++;best=Math.max(best,run);}else run=0;});
+ const known=Object.keys(state.dailyRecords||{}).concat(Object.keys(state.streakMap||{}),[today]).sort();
+ const first=known[0]||today;
+ for(let ds=first;ds<=today;ds=shiftDateKey(ds,1)){if(getStreakDayData(ds).status==='complete'){run++;best=Math.max(best,run);}else run=0;}
  document.getElementById('streakBest').textContent=Math.max(best,current);
  document.getElementById('streakMonthPct').textContent=(monthTotal?Math.round(monthDone/monthTotal*100):0)+'%';
 }
